@@ -1,0 +1,32 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('launcher', {
+  getLibrary: () => ipcRenderer.invoke('library:get'),
+  pickGameFile: () => ipcRenderer.invoke('dialog:pickGameFile'),
+  pickCover: () => ipcRenderer.invoke('dialog:pickCover'),
+  addGame: (data) => ipcRenderer.invoke('game:add', data),
+  updateGame: (data) => ipcRenderer.invoke('game:update', data),
+  removeGame: (id) => ipcRenderer.invoke('game:remove', id),
+  launch: (id) => ipcRenderer.invoke('game:launch', id),
+  stop: (id) => ipcRenderer.invoke('game:stop', id),
+  showInFolder: (id) => ipcRenderer.invoke('game:showInFolder', id),
+  toggleFavorite: (id) => ipcRenderer.invoke('game:favorite', id),
+  onLibraryChanged: (cb) => ipcRenderer.on('library:changed', (_e, games) => cb(games)),
+
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
+  getAppInfo: () => ipcRenderer.invoke('app:info'),
+  openDataFolder: () => ipcRenderer.invoke('app:openDataFolder'),
+  refreshCovers: () => ipcRenderer.invoke('covers:refreshMissing'),
+
+  getAccount: () => ipcRenderer.invoke('account:get'),
+  signIn: (data) => ipcRenderer.invoke('account:signIn', data),
+  signUp: (data) => ipcRenderer.invoke('account:signUp', data),
+  signOut: () => ipcRenderer.invoke('account:signOut'),
+  syncNow: () => ipcRenderer.invoke('account:sync'),
+  getProfile: () => ipcRenderer.invoke('profile:get'),
+  pickAvatar: () => ipcRenderer.invoke('profile:pickAvatar'),
+  removeAvatar: () => ipcRenderer.invoke('profile:removeAvatar'),
+  onAccountChanged: (cb) => ipcRenderer.on('account:changed', (_e, state) => cb(state)),
+  onLaunchError: (cb) => ipcRenderer.on('launch:error', (_e, msg) => cb(msg)),
+});

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' cover: file: data:; style-src 'self'; font-src 'self'; script-src 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zruxr</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="splash" class="splash">
+    <svg class="splash-logo" viewBox="124 140 282 244" aria-hidden="true"><path fill="currentColor" d="M133 150H383V207L222 305H383V362H133V305L294 207H133Z"/><circle cx="369" cy="348" r="30" fill="#a3a3a3"/></svg>
+    <div class="splash-mark">Zruxr</div>
+    <div class="splash-bar"><div id="splashFill" class="splash-fill"></div></div>
+    <div id="splashStatus" class="splash-status"></div>
+  </div>
+
+  <div class="app">
+    <header class="titlebar">
+      <span class="logo rise" data-rise="0" aria-label="Zruxr"><svg class="logo-mark" viewBox="124 140 282 244" aria-hidden="true"><path fill="currentColor" d="M133 150H383V207L222 305H383V362H133V305L294 207H133Z"/><circle cx="369" cy="348" r="30" fill="#a3a3a3"/></svg><span class="logo-text">Zruxr</span></span>
+
+      <nav class="tabs rise" data-rise="1" id="tabs" role="tablist" aria-label="Sections">
+        <button class="tab active" role="tab" aria-selected="true" data-tab="library">Library</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="favorites">Favorites<span class="tab-count" id="favCount" hidden></span></button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="stats">Stats</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="friends">Friends</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="settings">Settings</button>
+        <span class="tab-ink" id="tabInk"></span>
+      </nav>
+
+      <div class="titlebar-right rise" data-rise="2">
+        <button id="accountBtn" class="account-btn" title="Account" aria-haspopup="true" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c.9-3.6 3.7-5.4 7.5-5.4s6.6 1.8 7.5 5.4"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ================= Library / Favorites ================= -->
+      <div id="pageGames" class="page">
+        <section class="hero">
+          <div class="hero-text rise" data-rise="1">
+            <h1 id="greeting">Hello.</h1>
+            <p class="stats" id="stats"></p>
+          </div>
+
+          <div class="hero-tools rise" data-rise="2">
+            <label class="search" for="search">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+              <input id="search" type="text" placeholder="Search library" autocomplete="off" spellcheck="false" />
+              <kbd>/</kbd>
+            </label>
+            <div class="select-wrap">
+              <select id="sortSelect" aria-label="Sort games">
+                <option value="name">A&ndash;Z</option>
+                <option value="recent">Recently played</option>
+                <option value="played">Most played</option>
+                <option value="added">Recently added</option>
+              </select>
+            </div>
+            <button id="addBtn" class="btn primary">Add game</button>
+          </div>
+        </section>
+
+        <section id="featured" class="featured rise" data-rise="3" hidden></section>
+
+        <section id="libraryBlock" class="rise" data-rise="4">
+          <div class="section-head">
+            <h2 id="sectionTitle">All games</h2>
+            <span class="section-count" id="sectionCount"></span>
+          </div>
+          <div id="grid" class="grid"></div>
+          <p id="noResults" class="no-results" hidden>No games match your search.</p>
+          <div id="emptyFavs" class="empty-inline" hidden>
+            <h3>No favorites yet.</h3>
+            <p>Hover a game in your library and click the star to keep it here.</p>
+          </div>
+        </section>
+
+        <section id="empty" class="empty rise" data-rise="3" hidden>
+          <h2>Nothing here yet.</h2>
+          <p>Add a game by choosing its .exe file. Cover art is found automatically.</p>
+          <button id="emptyAddBtn" class="btn primary">Add your first game</button>
+        </section>
+      </div>
+
+      <!-- ================= Stats ================= -->
+      <div id="pageStats" class="page" hidden>
+        <section class="page-head">
+          <h1>Stats</h1>
+          <p class="stats" id="statsSub"></p>
+        </section>
+
+        <section id="statTiles" class="tiles"></section>
+
+        <div class="panels">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Last 7 days</h3>
+              <span class="panel-sub" id="weekTotal"></span>
+            </div>
+            <div id="weekChart" class="week"></div>
+            <p class="panel-note" id="weekNote"></p>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Most played</h3>
+            </div>
+            <ol id="topList" class="toplist"></ol>
+            <p class="panel-note" id="topNote" hidden>Nothing played yet. Launch a game and it will show up here.</p>
+          </section>
+        </div>
+      </div>
+
+      <!-- ================= Friends (placeholder) ================= -->
+      <div id="pageFriends" class="page" hidden>
+        <section class="page-head">
+          <h1>Friends</h1>
+          <p class="stats">Coming in the next update</p>
+        </section>
+
+        <section class="panel coming">
+          <span class="soon-badge">Coming soon</span>
+          <h3>Friends is coming in the next update.</h3>
+          <p class="panel-note">There's nothing to set up yet. It will show up here when it's ready.</p>
+          <div class="friend-add" aria-hidden="true">
+            <input type="text" placeholder="Add a friend by username" disabled tabindex="-1" />
+            <button type="button" class="btn" disabled tabindex="-1">Add friend</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- ================= Settings ================= -->
+      <div id="pageSettings" class="page" hidden>
+        <section class="page-head">
+          <h1>Settings</h1>
+          <p class="stats">Make Zruxr yours</p>
+        </section>
+
+        <div class="settings">
+          <section class="setting-group">
+            <h3>Appearance</h3>
+            <div class="setting-card">
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-name">Cover size</div>
+                  <div class="setting-desc">How big the games are in your library.</div>
+                </div>
+                <div class="segmented" id="sizeSeg" role="group" aria-label="Cover size">
+                  <button type="button" data-size="small">Small</button>
+                  <button type="button" data-size="medium">Medium</button>
+                  <button type="button" data-size="large">Large</button>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-name">Startup animation</div>
+                  <div class="setting-desc">Show the loading screen and fade-in when Zruxr opens.</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="optSplash" /><span></span></label>
+              </div>
+            </div>
+          </section>
+
+          <section class="setting-group">
+            <h3>General</h3>
+            <div class="setting-card">
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-name">Start with Windows</div>
+                  <div class="setting-desc" id="startDesc">Open Zruxr when you sign in to your PC.</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="optStartup" /><span></span></label>
+              </div>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-name">Account</div>
+                  <div class="setting-desc" id="acctDesc">Not signed in</div>
+                </div>
+                <button type="button" class="btn" id="manageAccount">Manage</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="setting-group">
+            <h3>Library</h3>
+            <div class="setting-card">
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-name">Find missing covers</div>
+                  <div class="setting-desc">Look up cover art again for games that don't have any.</div>
+                </div>
+                <button type="button" class="btn" id="refreshCovers">Search now</button>
+              </div>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-name">Data folder</div>
+                  <div class="setting-desc path" id="dataPath">&hellip;</div>
+                </div>
+                <button type="button" class="btn" id="openData">Open</button>
+              </div>
+            </div>
+          </section>
+
+          <p class="about" id="about"></p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Account panel: lives at the top level so nothing can paint over it -->
+  <div id="accountPop" class="overlay" hidden>
+    <div class="account-card" role="dialog" aria-modal="true" aria-label="Account">
+      <button type="button" id="accountClose" class="card-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+              <div id="authView">
+                <div class="gate-logo"><svg class="" viewBox="124 140 282 244" aria-hidden="true"><path fill="currentColor" d="M133 150H383V207L222 305H383V362H133V305L294 207H133Z"/><circle cx="369" cy="348" r="30" fill="#a3a3a3"/></svg><span>Zruxr</span></div>
+                <div class="pop-head">
+                  <div class="pop-avatar">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c.9-3.6 3.7-5.4 7.5-5.4s6.6 1.8 7.5 5.4"/></svg>
+                  </div>
+                  <div>
+                    <div class="pop-title" id="authTitle">Sign in</div>
+                    <div class="pop-sub" id="authSub">Sync your library across PCs</div>
+                  </div>
+                </div>
+                <form id="authForm" class="auth-form" novalidate>
+                  <input type="text" id="authEmail" placeholder="Username" autocomplete="username" maxlength="20" spellcheck="false" autocapitalize="off" />
+                  <input type="password" id="authPass" placeholder="Password" autocomplete="current-password" />
+                  <p id="authMsg" class="auth-msg" hidden></p>
+                  <button type="submit" id="authSubmit" class="btn primary wide">Sign in</button>
+                  <button type="button" id="authToggle" class="link auth-toggle">New here? Create an account</button>
+                </form>
+              </div>
+              <div id="accountView" hidden>
+                <div class="pop-head">
+                  <button type="button" class="pop-avatar avatar-edit" id="accountAvatar" title="Change profile picture" aria-label="Change profile picture"></button>
+                  <div class="pop-who">
+                    <div class="pop-title pop-email" id="accountEmail"></div>
+                    <div class="pop-sub" id="accountSync"></div>
+                  </div>
+                </div>
+                <div class="account-actions">
+                  <button type="button" id="syncBtn" class="btn wide">Sync now</button>
+                  <button type="button" id="avatarBtn" class="btn wide">Change picture</button>
+                  <button type="button" id="removeAvatarBtn" class="btn ghost wide" hidden>Remove picture</button>
+                  <button type="button" id="signOutBtn" class="btn ghost wide">Sign out</button>
+                </div>
+              </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- Add / Edit dialog -->
+  <dialog id="gameDialog">
+    <form method="dialog" id="gameForm">
+      <h2 id="dialogTitle">Add game</h2>
+
+      <label>Game file</label>
+      <div class="row">
+        <input type="text" id="fPath" readonly placeholder="Choose the game's .exe" />
+        <button type="button" id="browsePath" class="btn">Browse</button>
+      </div>
+
+      <label for="fName">Name</label>
+      <input type="text" id="fName" placeholder="Game name" />
+      <p class="field-note" id="nameNote">The name is used to find cover art automatically.</p>
+
+      <div id="coverSection" hidden>
+        <label>Cover art</label>
+        <div class="cover-row">
+          <div id="coverPreview" class="cover-preview"></div>
+          <div class="col">
+            <button type="button" id="browseCover" class="btn">Use my own image</button>
+            <button type="button" id="resetCover" class="btn ghost">Find automatically</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" id="cancelBtn" class="btn ghost">Cancel</button>
+        <button type="submit" id="saveBtn" class="btn primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

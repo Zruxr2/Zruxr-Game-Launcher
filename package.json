@@ -1,0 +1,46 @@
+{
+  "name": "zruxr",
+  "productName": "Zruxr",
+  "version": "1.2.0",
+  "description": "Zruxr - a simple launcher for your own game files.",
+  "author": "Zruxr",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable",
+    "dist:setup": "electron-builder --win nsis",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.zruxr.launcher",
+    "productName": "Zruxr",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "cloud.js",
+      "renderer/**/*",
+      "build/icon.png"
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": ["nsis", "portable"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "artifactName": "Zruxr-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Zruxr-Portable-${version}.${ext}"
+    }
+  }
+}
