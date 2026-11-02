@@ -138,7 +138,6 @@ setInterval(() => {
 }, 60 * 1000);
 
 function launchGame(id) {
-  if (!cloud.isSignedIn()) return { ok: false, error: 'Sign in to play your games.' };
   if (running.has(id)) return { ok: false, error: 'Game is already running.' };
   const game = loadLibrary().find((g) => g.id === id);
   if (!game) return { ok: false, error: 'Game not found.' };
@@ -463,8 +462,8 @@ function storeAvatar(srcPath) {
 }
 
 // ---------- IPC ----------
-// Signed out = locked: the library isn't served and games won't launch.
-ipcMain.handle('library:get', () => (cloud.isSignedIn() ? withStatus(loadLibrary()) : []));
+// An account is optional: the library works fully offline, signing in just adds sync.
+ipcMain.handle('library:get', () => withStatus(loadLibrary()));
 
 ipcMain.handle('dialog:pickGameFile', async () => {
   const res = await dialog.showOpenDialog(win, {
