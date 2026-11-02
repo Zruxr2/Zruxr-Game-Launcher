@@ -1130,7 +1130,9 @@ dialog[open]::backdrop { animation: fadeIn .3s ease both; }
   text-transform: uppercase;
 }
 
-/* Locked = you must sign in. No close button, solid background, window still draggable. */
+/* Welcome screen (shown at launch when signed out). Optional: "Not now" closes it. */
+.auth-skip { display: none; color: var(--muted, #8c8c8c); }
+.overlay.locked .auth-skip { display: block; }
 .overlay.locked {
   background: radial-gradient(70% 55% at 50% 38%, #151515 0%, var(--bg) 72%);
   -webkit-backdrop-filter: none;

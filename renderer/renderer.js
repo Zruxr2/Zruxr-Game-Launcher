@@ -53,7 +53,7 @@ let tab = 'library'; // 'library' | 'favorites' | 'stats' | 'friends' | 'setting
 let settings = { cardSize: 'medium', startupAnimation: true, startWithWindows: false, sort: 'name' };
 let appInfo = { version: '', dataDir: '', packaged: false };
 let account = { email: null, syncing: false, lastSync: null, error: null };
-let locked = false; // true while the sign-in gate is up
+let locked = false; // true while the welcome (create-account) screen is up. It's optional: "Not now" closes it.
 let booted = false; // the startup sequence has finished deciding what to show
 let authMode = 'signin'; // 'signin' | 'signup'
 let profileAvatar = { user: null, file: null }; // profile picture of the signed-in user
@@ -586,7 +586,6 @@ document.addEventListener('keydown', (e) => {
 // ---------- Account panel ----------
 let accountCloseTimer = null;
 function setAccountOpen(open) {
-  if (!open && locked) return; // the gate can't be dismissed
   clearTimeout(accountCloseTimer);
   accountBtn.setAttribute('aria-expanded', String(open));
   if (open) {
@@ -631,7 +630,7 @@ function setAuthMode(mode) {
   const up = mode === 'signup';
   if (locked) {
     authTitle.textContent = up ? 'Create your account' : 'Welcome back';
-    authSub.textContent = up ? 'You need an account to use Zruxr. It takes a few seconds.' : 'Sign in to open your library';
+    authSub.textContent = up ? 'Optional, and free. Syncs your library between PCs.' : 'Sign in to sync your library';
   } else {
     authTitle.textContent = up ? 'Create account' : 'Sign in';
     authSub.textContent = up ? 'Free. Your library syncs between PCs.' : 'Sync your library across PCs';
@@ -642,37 +641,30 @@ function setAuthMode(mode) {
   hideAuthMsg();
 }
 
-function lockApp() {
+// Signed out when Zruxr opens: offer to create an account. It's optional, so "Not now"
+// (or signing in) just closes it and the app carries on. Comes back next launch.
+function showWelcome() {
+  if (account.email || locked) return;
   locked = true;
   accountPop.classList.add('locked');
-  document.body.classList.remove('ready');
-  games = [];
-  animateCards = true; // so the library animates in again after signing in
-  render(); // clear the library off the screen
   authPass.value = '';
-  setAuthMode(authMode);
+  setAuthMode(account.error ? 'signin' : 'signup'); // an expired saved login goes to sign in
   setAccountOpen(true);
 }
 
-async function unlockApp() {
+function closeWelcome() {
+  if (!locked) return;
   locked = false;
   hideAuthMsg();
   authEmail.value = '';
   authPass.value = '';
-  setAccountOpen(false); // fades the gate out
+  setAccountOpen(false); // fades the welcome screen out
   setTimeout(() => { if (!locked) accountPop.classList.remove('locked'); }, 360);
-  try { games = await window.launcher.getLibrary(); } catch { games = []; }
-  render();
-  document.body.classList.add('ready');
-  setTimeout(() => { animateCards = false; }, 1800);
 }
+document.getElementById('authSkip').addEventListener('click', closeWelcome);
 
 function renderAccount() {
-  // Signed out = locked. Signed in = unlocked.
-  if (booted) {
-    if (!account.email && !locked) lockApp();
-    else if (account.email && locked) unlockApp();
-  }
+  if (booted && account.email && locked) closeWelcome(); // signed in from the welcome screen
   const signed = !!account.email;
   authView.hidden = signed;
   accountView.hidden = !signed;
@@ -911,7 +903,6 @@ async function boot() {
   document.querySelectorAll('[data-rise]').forEach((el) => el.style.setProperty('--i', el.dataset.rise));
 
   window.launcher.onLibraryChanged((updated) => {
-    if (locked) return;
     games = updated;
     render();
   });
@@ -935,12 +926,12 @@ async function boot() {
     document.body.classList.add('instant');
     splash.classList.add('done');
     booted = true;
-    if (!account.email) { lockApp(); return; }
     games = await libraryPromise;
     animateCards = false;
     document.body.classList.add('ready');
     renderAccount();
     render();
+    setTimeout(showWelcome, 700);
     return;
   }
 
@@ -949,17 +940,6 @@ async function boot() {
 
   setStep('Checking account', 60);
   account = await accountPromise;
-  if (!account.email) {
-    // Nobody is signed in: hold the app back and ask for an account.
-    setStep('Sign in to continue', 100);
-    await wait(500);
-    booted = true;
-    lockApp();
-    await wait(380);
-    splash.classList.add('done');
-    return;
-  }
-
   setStep('Loading library', 85);
   games = await libraryPromise;
   render();
@@ -973,6 +953,7 @@ async function boot() {
   splash.classList.add('done');
   document.body.classList.add('ready');
   setTimeout(() => { animateCards = false; }, 1800);
+  setTimeout(showWelcome, 900);
 }
 
 boot();
