@@ -16,7 +16,8 @@ A fast, dark game launcher for Windows. Point it at any `.exe` and Zruxr finds t
 
 <br />
 
-<img src="docs/library.png" alt="Zruxr library view" width="900" />
+<img src="<img width="1169" height="773" alt="image" src="https://github.com/user-attachments/assets/1a4b2d2e-e17a-4472-b356-f88a4cd18e3f" />
+" alt="Zruxr library view" width="900" />
 
 </div>
 
