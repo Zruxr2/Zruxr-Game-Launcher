@@ -49,6 +49,8 @@ const coverPreview = document.getElementById('coverPreview');
 
 let games = [];
 let query = '';
+let discover = { sections: [] }; // popular on Steam, from the main process
+let discoverTab = 'top';
 let tab = 'library'; // 'library' | 'favorites' | 'stats' | 'friends' | 'settings'
 let settings = { cardSize: 'medium', startupAnimation: true, startWithWindows: false, sort: 'name' };
 let appInfo = { version: '', dataDir: '', packaged: false };
@@ -311,6 +313,7 @@ function renderGames(opts = {}) {
   libraryBlock.hidden = !hasGames;
   emptyFavs.hidden = !(isFav && hasGames && favs.length === 0);
   renderFeatured();
+  updateDiscover();
 
   const q = query.trim().toLowerCase();
   const visible = base.filter((g) => !q || g.name.toLowerCase().includes(q)).sort(sorters[settings.sort] || byName);
@@ -487,6 +490,7 @@ function renderSettings() {
     b.setAttribute('aria-pressed', String(b.dataset.size === settings.cardSize));
   });
   document.getElementById('optSplash').checked = !!settings.startupAnimation;
+  document.getElementById('optDiscover').checked = settings.showDiscover !== false;
 
   const startup = document.getElementById('optStartup');
   startup.checked = !!settings.startWithWindows;
@@ -520,6 +524,12 @@ document.getElementById('sizeSeg').addEventListener('click', (e) => {
   if (b) saveSettings({ cardSize: b.dataset.size });
 });
 document.getElementById('optSplash').addEventListener('change', (e) => saveSettings({ startupAnimation: e.target.checked }));
+document.getElementById('optDiscover').addEventListener('change', async (e) => {
+  await saveSettings({ showDiscover: e.target.checked });
+  if (e.target.checked && !discover.sections.length) loadDiscover(false);
+  updateDiscover();
+});
+document.getElementById('scanNow').addEventListener('click', () => openScan());
 document.getElementById('optStartup').addEventListener('change', (e) => saveSettings({ startWithWindows: e.target.checked }));
 document.getElementById('manageAccount').addEventListener('click', () => setAccountOpen(true));
 document.getElementById('openData').addEventListener('click', () => window.launcher.openDataFolder());
@@ -877,6 +887,253 @@ document.getElementById('gameForm').addEventListener('submit', async (e) => {
 
 document.getElementById('addBtn').addEventListener('click', () => openDialog('add'));
 document.getElementById('emptyAddBtn').addEventListener('click', () => openDialog('add'));
+document.getElementById('scanBtn').addEventListener('click', () => openScan());
+document.getElementById('emptyScanBtn').addEventListener('click', () => openScan());
+
+// ---------- Discover: a slim row of what's popular on Steam ----------
+const discoverEl = document.getElementById('discover');
+const discoverTabsEl = document.getElementById('discoverTabs');
+const discoverRowEl = document.getElementById('discoverRow');
+
+function discoverCard(it) {
+  const card = make('button', 'dcard');
+  card.type = 'button';
+  card.title = `${it.name} (opens on Steam)`;
+  const img = make('div', 'dimg');
+  if (it.image) img.style.backgroundImage = `url("cover://discover/${encodeURIComponent(it.image)}")`;
+  else img.style.background = `linear-gradient(135deg, hsl(${hueFor(it.name)} 38% 24%), hsl(${hueFor(it.name)} 38% 9%))`;
+  if (it.discount) img.appendChild(make('span', 'dbadge', `-${it.discount}%`));
+  card.append(img, make('div', 'dname', it.name), make('div', 'dprice' + (it.price === 'Free' ? ' free' : ''), it.price || '\u00a0'));
+  card.addEventListener('click', () => window.launcher.discoverOpen(it.id));
+  return card;
+}
+
+function buildDiscover() {
+  const sections = discover.sections || [];
+  if (!sections.some((s) => s.id === discoverTab)) discoverTab = sections[0] ? sections[0].id : '';
+  discoverTabsEl.replaceChildren();
+  for (const s of sections) {
+    const b = make('button', 'dtab' + (s.id === discoverTab ? ' on' : ''), s.title);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      discoverTab = s.id;
+      buildDiscover();
+    });
+    discoverTabsEl.appendChild(b);
+  }
+  discoverRowEl.replaceChildren();
+  discoverRowEl.scrollLeft = 0;
+  discoverTarget = null;
+  const sec = sections.find((s) => s.id === discoverTab);
+  if (sec) sec.items.forEach((it) => discoverRowEl.appendChild(discoverCard(it)));
+}
+
+function updateDiscover() {
+  const show = tab === 'library' && !query.trim() && settings.showDiscover !== false && (discover.sections || []).length > 0;
+  discoverEl.hidden = !show;
+}
+
+async function loadDiscover(force) {
+  try {
+    discover = await window.launcher.discoverGet(!!force);
+  } catch {
+    discover = { sections: [] };
+  }
+  if (!discover || !Array.isArray(discover.sections)) discover = { sections: [] };
+  buildDiscover();
+  updateDiscover();
+}
+
+// Scrolling the row: one eased glide shared by the arrows and the mouse wheel.
+let discoverTarget = null;
+let discoverRaf = 0;
+const discoverMax = () => Math.max(0, discoverRowEl.scrollWidth - discoverRowEl.clientWidth);
+
+function discoverGlide(to) {
+  discoverTarget = Math.max(0, Math.min(discoverMax(), to));
+  if (discoverRaf) return;
+  const tick = () => {
+    if (discoverTarget === null) {
+      discoverRaf = 0;
+      return;
+    }
+    discoverTarget = Math.min(discoverTarget, discoverMax()); // the row may have shrunk meanwhile
+    const diff = discoverTarget - discoverRowEl.scrollLeft;
+    if (Math.abs(diff) <= 1) {
+      discoverRowEl.scrollLeft = discoverTarget;
+      discoverTarget = null;
+      discoverRaf = 0;
+      return;
+    }
+    const before = discoverRowEl.scrollLeft;
+    discoverRowEl.scrollLeft += Math.sign(diff) * Math.max(1, Math.abs(diff) * 0.18);
+    if (discoverRowEl.scrollLeft === before) {
+      // it can't move (row hidden or already at its end): stop instead of spinning
+      discoverTarget = null;
+      discoverRaf = 0;
+      return;
+    }
+    discoverRaf = requestAnimationFrame(tick);
+  };
+  discoverRaf = requestAnimationFrame(tick);
+}
+
+function scrollDiscover(dir) {
+  const card = discoverRowEl.firstElementChild;
+  const gap = parseFloat(getComputedStyle(discoverRowEl).columnGap) || 0;
+  const step = card ? (card.offsetWidth + gap) * 3 : discoverRowEl.clientWidth * 0.8;
+  discoverGlide((discoverTarget === null ? discoverRowEl.scrollLeft : discoverTarget) + dir * step);
+}
+
+// Mouse wheel over the row scrolls it sideways. At either end the wheel goes back to the
+// page, so the row never traps the scroll. Trackpad side-swipes are left to the browser.
+discoverRowEl.addEventListener(
+  'wheel',
+  (e) => {
+    if (e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY) || !e.deltaY) return;
+    const from = discoverTarget === null ? discoverRowEl.scrollLeft : discoverTarget;
+    if ((e.deltaY < 0 && from <= 0) || (e.deltaY > 0 && from >= discoverMax() - 1)) return;
+    e.preventDefault();
+    const px = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * discoverRowEl.clientWidth : e.deltaY;
+    discoverGlide(from + px * 1.6);
+  },
+  { passive: false }
+);
+document.getElementById('discoverPrev').addEventListener('click', () => scrollDiscover(-1));
+document.getElementById('discoverNext').addEventListener('click', () => scrollDiscover(1));
+document.getElementById('discoverHide').addEventListener('click', async () => {
+  await saveSettings({ showDiscover: false });
+  updateDiscover();
+  showToast('Discover is hidden. Turn it back on in Settings.', 'info');
+});
+
+// ---------- Scan this PC for games ----------
+const scanDialog = document.getElementById('scanDialog');
+const scanStatus = document.getElementById('scanStatus');
+const scanList = document.getElementById('scanList');
+const scanAddBtn = document.getElementById('scanAdd');
+let scanItems = []; // { r: result, box: checkbox }
+let scanning = false;
+
+function scanView(name) {
+  for (const id of ['scanChoose', 'scanBusy', 'scanResults']) document.getElementById(id).hidden = id !== name;
+}
+
+function openScan() {
+  if (!scanning) scanView('scanChoose');
+  if (!scanDialog.open) scanDialog.showModal();
+}
+
+function updateScanAddButton() {
+  const n = scanItems.filter((x) => x.box.checked).length;
+  scanAddBtn.disabled = n === 0;
+  scanAddBtn.textContent = n === 0 ? 'Add games' : `Add ${n} game${n === 1 ? '' : 's'}`;
+}
+
+function showScanResults(res) {
+  const results = res.results || [];
+  const fresh = results.filter((r) => !r.already);
+  const known = results.length - fresh.length;
+  document.getElementById('scanSummary').textContent = results.length
+    ? `${fresh.length} new game${fresh.length === 1 ? '' : 's'} found${known ? ` · ${known} already in your library` : ''}`
+    : 'No games found';
+
+  scanList.replaceChildren();
+  scanItems = [];
+  const ordered = [...fresh, ...results.filter((r) => r.already)];
+  for (const r of ordered) {
+    const row = make('label', 'scan-row' + (r.already ? ' is-added' : ''));
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = !r.already;
+    box.disabled = !!r.already;
+    box.addEventListener('change', updateScanAddButton);
+    const info = make('div', 'scan-info');
+    const name = make('div', 'scan-name', r.name);
+    const where = make('div', 'scan-path', r.path);
+    where.title = r.path;
+    info.append(name, where);
+    row.append(box, info, make('span', 'scan-src', r.already ? 'Added' : r.source));
+    scanList.appendChild(row);
+    scanItems.push({ r, box });
+  }
+
+  const note = document.getElementById('scanNote');
+  const notes = [];
+  if (res.cancelled) notes.push('Scan stopped early, so this list may be incomplete.');
+  else if (res.truncated) notes.push('This scan hit its time limit, so some folders weren\u2019t checked. Try a folder scan for the rest.');
+  if (!results.length) notes.push('Nothing turned up. Try Whole PC, or pick the folder your games are in.');
+  note.textContent = notes.join(' ');
+  note.hidden = !notes.length;
+
+  scanList.hidden = !results.length;
+  document.querySelector('#scanResults .scan-pick').hidden = !fresh.length;
+  scanAddBtn.hidden = !fresh.length;
+  updateScanAddButton();
+  scanView('scanResults');
+}
+
+async function startScan(mode) {
+  scanning = true;
+  scanStatus.textContent = mode === 'folder' ? 'Choosing a folder\u2026' : 'Starting\u2026';
+  scanView('scanBusy');
+  let res;
+  try {
+    res = await window.launcher.scanRun(mode);
+  } catch {
+    res = { ok: false, error: 'The scan failed. Try again.' };
+  }
+  scanning = false;
+  if (!scanDialog.open) return; // closed while scanning
+  if (!res.ok) {
+    showToast(res.error || 'The scan failed.');
+    scanView('scanChoose');
+  } else if (res.canceled) {
+    scanView('scanChoose'); // they closed the folder picker
+  } else {
+    showScanResults(res);
+  }
+}
+
+window.launcher.onScanProgress((p) => {
+  if (!scanning) return;
+  scanStatus.textContent = `${p.folders.toLocaleString()} folders checked \u00b7 ${p.found} game${p.found === 1 ? '' : 's'} found`;
+});
+
+document.querySelectorAll('.scan-opt').forEach((b) => b.addEventListener('click', () => startScan(b.dataset.mode)));
+document.getElementById('scanCancel').addEventListener('click', () => {
+  scanStatus.textContent = 'Stopping\u2026';
+  window.launcher.scanCancel();
+});
+document.getElementById('scanAgain').addEventListener('click', () => scanView('scanChoose'));
+document.getElementById('scanAll').addEventListener('click', () => {
+  scanItems.forEach((x) => { if (!x.box.disabled) x.box.checked = true; });
+  updateScanAddButton();
+});
+document.getElementById('scanNone').addEventListener('click', () => {
+  scanItems.forEach((x) => { x.box.checked = false; });
+  updateScanAddButton();
+});
+document.getElementById('scanClose').addEventListener('click', () => scanDialog.close());
+scanDialog.addEventListener('close', () => {
+  if (scanning) window.launcher.scanCancel();
+});
+scanAddBtn.addEventListener('click', async () => {
+  const paths = scanItems.filter((x) => x.box.checked).map((x) => x.r.path);
+  if (!paths.length) return;
+  scanAddBtn.disabled = true;
+  scanAddBtn.textContent = 'Adding\u2026';
+  try {
+    games = await window.launcher.scanAdd(paths);
+  } catch {
+    showToast('Could not add the games. Try again.');
+    updateScanAddButton();
+    return;
+  }
+  scanDialog.close();
+  render({ intro: true });
+  showToast(`Added ${paths.length} game${paths.length === 1 ? '' : 's'}. Finding covers\u2026`, 'info');
+});
 
 // ---------- Startup ----------
 const splash = document.getElementById('splash');
@@ -913,6 +1170,7 @@ async function boot() {
   });
 
   try { settings = await window.launcher.getSettings(); } catch {}
+  if (settings.showDiscover !== false) loadDiscover(false); // runs in the background, never delays startup
   applySettings();
   window.launcher.getAppInfo().then((info) => { appInfo = info; if (tab === 'settings') renderSettings(); }).catch(() => {});
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(moveInk);

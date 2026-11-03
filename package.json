@@ -4,7 +4,27 @@
   "version": "1.2.0",
   "description": "Zruxr - a simple launcher for your own game files.",
   "author": "Zruxr",
+  "license": "MIT",
+  "private": true,
   "main": "main.js",
+  "homepage": "https://github.com/OWNER/REPO#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OWNER/REPO.git"
+  },
+  "bugs": {
+    "url": "https://github.com/OWNER/REPO/issues"
+  },
+  "keywords": [
+    "game-launcher",
+    "electron",
+    "windows",
+    "library",
+    "playtime-tracker"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win nsis portable",
@@ -26,12 +46,17 @@
       "main.js",
       "preload.js",
       "cloud.js",
+      "scanner.js",
+      "discover.js",
       "renderer/**/*",
       "build/icon.png"
     ],
     "win": {
       "icon": "build/icon.png",
-      "target": ["nsis", "portable"]
+      "target": [
+        "nsis",
+        "portable"
+      ]
     },
     "nsis": {
       "oneClick": false,

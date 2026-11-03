@@ -1208,3 +1208,211 @@ button.pop-avatar:active { transform: scale(.95); }
   transition: opacity .2s ease;
 }
 .avatar-edit:hover::after, .avatar-edit:focus-visible::after { opacity: 1; }
+
+
+/* =====================================================================
+   Discover (slim row of popular Steam games) + Scan for games
+   ===================================================================== */
+.discover { margin: 8px 0 40px; }
+.featured:not([hidden]) + .discover { margin-top: -14px; }
+.discover-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+.discover-label {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .16em;
+}
+.discover-tabs { display: flex; gap: 4px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.discover-tabs::-webkit-scrollbar { display: none; }
+.dtab {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: 500 12.5px var(--sans);
+  cursor: pointer;
+  transition: color .15s, background .15s, border-color .15s;
+}
+.dtab:hover { color: var(--text); }
+.dtab.on { color: var(--text); background: var(--panel-2); border-color: var(--line-2); }
+.discover-ctrl { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.dnav {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.dnav:hover { color: var(--text); border-color: #5a5a5a; background: var(--panel-2); }
+.discover-ctrl .link { margin-left: 6px; font-size: 12.5px; }
+
+.discover-row {
+  display: flex;
+  gap: 28px;
+  overflow-x: auto;
+  /* room for the hover lift above and the shadow below, since overflow clips both */
+  padding: 12px 28px 22px;
+  margin: -12px -28px -8px;
+  scroll-padding-inline: 28px;
+  scrollbar-width: thin;
+  scrollbar-color: #262626 transparent;
+}
+.dcard {
+  flex: 0 0 var(--card-min); /* follows the card size setting, same as the library grid */
+  width: var(--card-min);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--sans);
+}
+/* the same portrait cover as the library, so the two read as one family */
+.dimg {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 11px;
+  overflow: hidden;
+  background: var(--panel) center / cover no-repeat;
+  box-shadow: 0 14px 24px -16px rgba(0, 0, 0, .95);
+  filter: brightness(.9) saturate(1.04);
+  transition: transform .45s var(--ease), box-shadow .45s var(--ease), filter .25s ease;
+}
+.dimg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .11) 0%, rgba(255, 255, 255, 0) 24%, rgba(0, 0, 0, 0) 52%, rgba(0, 0, 0, .46) 100%);
+}
+.dimg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .09);
+  pointer-events: none;
+}
+.dcard:hover .dimg {
+  filter: none;
+  transform: translateY(-7px) scale(1.012);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, .3),
+    0 28px 48px -18px rgba(255, 255, 255, .5),
+    0 20px 30px -14px rgba(0, 0, 0, .85);
+}
+.dcard:focus-visible { outline: none; }
+.dcard:focus-visible .dimg { filter: none; box-shadow: 0 0 0 2px #fff; }
+.dbadge {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  left: 10px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+.dname {
+  margin-top: 14px;
+  font-family: var(--display);
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -.015em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dprice { margin-top: 3px; font-size: 12px; color: var(--muted); }
+.dprice.free { color: var(--text); }
+
+.empty-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* ---- Scan dialog ---- */
+.scan-dialog { width: 560px; }
+.scan-lead { margin: 0 0 18px; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+.scan-opt {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 14px 16px;
+  text-align: left;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: border-color .15s, background .15s, transform .15s var(--ease);
+}
+.scan-opt:hover { border-color: #6a6a6a; background: var(--panel-2); }
+.scan-opt:active { transform: scale(.99); }
+.scan-opt strong { display: block; font-size: 14.5px; font-weight: 600; margin-bottom: 3px; }
+.scan-opt span { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+
+#scanBusy { text-align: center; padding: 18px 0 0; }
+.scan-spinner {
+  width: 30px;
+  height: 30px;
+  margin: 0 auto 16px;
+  border: 2px solid var(--line-2);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  animation: scanSpin .8s linear infinite;
+}
+@keyframes scanSpin { to { transform: rotate(360deg); } }
+.scan-status { margin: 0; color: var(--muted); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+#scanBusy .actions { justify-content: center; margin-top: 24px; }
+
+.scan-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 6px 0 12px; font-size: 13px; color: var(--muted); }
+.scan-pick { display: flex; gap: 12px; }
+.scan-list {
+  max-height: min(360px, 46vh);
+  overflow-y: auto;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--bg);
+}
+.scan-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+  cursor: pointer;
+}
+.scan-row:last-child { border-bottom: none; }
+.scan-row:hover { background: var(--panel); }
+.scan-row.is-added { opacity: .5; cursor: default; }
+.scan-row input { flex-shrink: 0; width: 16px; height: 16px; margin: 0; accent-color: #f0f0f0; }
+.scan-info { flex: 1; min-width: 0; }
+.scan-name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scan-path { margin-top: 2px; color: var(--faint); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+.scan-src { flex-shrink: 0; padding: 3px 8px; border: 1px solid var(--line-2); border-radius: 999px; color: var(--muted); font-size: 11px; }
+#scanResults .actions { margin-top: 20px; }

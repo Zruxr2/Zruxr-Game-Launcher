@@ -28,6 +28,10 @@ Most launchers want you to buy things. Zruxr doesn't sell anything. It's for the
 
 ## Features
 
+**Find your games for you.** Press **Scan PC** and Zruxr finds games already installed: Steam libraries (read from Steam's own files), Epic, GOG and your Games folders. Tick the ones you want and add them in one go. "Whole PC" mode searches every drive, and you can also scan a single folder. It only reads folder and file names, nothing is changed or uploaded.
+
+**Discover, kept small.** A slim row on the home page shows what's popular on Steam right now: top sellers, top free, new releases and what's on sale. Click a game to open its store page. Hide it with one click, or turn it off in Settings.
+
 **Cover art, automatically.** Add a game and Zruxr looks it up by name (and by its folder name) and downloads the portrait art. You never upload an image. If a game can't be found, it gets a clean generated cover instead, and Zruxr checks again once a week.
 
 **Play time that tracks itself.** Launch from Zruxr and the clock runs until the game closes. Totals are saved as you play, and a "Jump back in" banner always puts your last game one click away.
@@ -36,7 +40,7 @@ Most launchers want you to buy things. Zruxr doesn't sell anything. It's for the
 
 **Stats you'll actually look at.** Total hours, this week's hours, a 7-day chart and your most played games.
 
-**Your account, your library everywhere.** Create a free account and your game list and play time follow you between PCs.
+**Accounts are optional.** Zruxr works fully without one. If you do create a free account, your game list and play time follow you between PCs.
 
 **Yours to tweak.** Small, medium or large covers, start with Windows, and a startup animation you can turn off.
 
@@ -44,10 +48,12 @@ Most launchers want you to buy things. Zruxr doesn't sell anything. It's for the
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/stats.png" alt="Stats tab" /></td>
-    <td width="50%"><img src="docs/settings.png" alt="Settings tab" /></td>
+    <td width="33%"><img src="docs/scan.png" alt="Scanning for installed games" /></td>
+    <td width="33%"><img src="docs/stats.png" alt="Stats tab" /></td>
+    <td width="33%"><img src="docs/settings.png" alt="Settings tab" /></td>
   </tr>
   <tr>
+    <td align="center"><sub>Scan PC finds your installed games</sub></td>
     <td align="center"><sub>Stats</sub></td>
     <td align="center"><sub>Settings</sub></td>
   </tr>
@@ -68,13 +74,13 @@ Windows SmartScreen may warn about an unknown publisher because the app isn't co
 
 ## Using it
 
-1. Click **Add game** and choose the game's `.exe` (or `.bat` / `.cmd`).
-2. Confirm the name. The name is what's used to find the cover.
+1. Click **Scan PC** to find installed games, tick the ones you want and press **Add**. Or click **Add game** and choose a game's `.exe` (or `.bat` / `.cmd`) yourself.
+2. Confirm the name if you added one by hand. The name is what's used to find the cover.
 3. Hover the cover and press **Play**, or double-click it.
 
 If a cover is wrong or missing, hover the game, click **Edit**, fix the name, or pick your own image. **Find automatically** switches back.
 
-**Shortcuts:** `1` to `4` switch tabs, `/` searches, `Esc` clears the search.
+**Shortcuts:** `1` to `5` switch tabs, `/` searches, `Esc` clears the search.
 
 Your library is saved in `%APPDATA%\Zruxr\library.json`, with covers in a `covers` folder beside it and your preferences in `settings.json`.
 
@@ -102,10 +108,9 @@ The app icon is `build/icon.png`. Swap it for your own image (at least 256 x 256
 <details>
 <summary><b>If Electron says it "failed to install correctly"</b></summary>
 
-Newer versions of npm block install scripts by default, which stops Electron from downloading its binary. Approve the script and rebuild:
+Electron downloads its binary in a post-install step, which some setups block (for example `--ignore-scripts` or a restrictive npm config). Re-run it manually:
 
 ```bash
-npm install-scripts approve electron
 npm rebuild electron
 ```
 
@@ -115,7 +120,7 @@ If that still doesn't work, delete `node_modules` and run `npm install` again.
 
 ## Accounts and sync
 
-Accounts use [Supabase](https://supabase.com). People sign in with a username and password, and the app handles the rest. Sign-in sessions are stored encrypted with Windows' own credential protection, so you stay signed in between launches.
+An account is completely optional. Zruxr asks once when it opens, and you can click **Not now** to use everything offline. Accounts use [Supabase](https://supabase.com). People sign in with a username and password, and the app handles the rest. Sign-in sessions are stored encrypted with Windows' own credential protection, so you stay signed in between launches.
 
 If you fork this and want your own backend, create a Supabase project, then replace `SUPABASE_URL` and `ANON_KEY` at the top of `cloud.js`. The anon key is designed to be public, but make sure Row Level Security is switched on for your tables so users can only read and write their own library.
 
@@ -126,18 +131,28 @@ If you fork this and want your own backend, create a Supabase project, then repl
 - `.lnk` shortcuts aren't supported yet. Pick the real `.exe` instead.
 - Automatic covers only match games that exist on Steam, and only on a close name match. That's deliberate, so unofficial games don't end up with the wrong art.
 - "Start with Windows" only works in the installed or portable app, not under `npm start`.
+- Scan PC doesn't find Microsoft Store / Xbox games, and some Epic games may need the Epic launcher open to run from Zruxr.
+- "Whole PC" scans can take a few minutes, and stop after four.
+- The Discover row needs an internet connection. It uses Steam's public store data and stays hidden when offline.
+- The Friends tab is a placeholder for now.
 - Windows only for now.
 
 ## Roadmap
 
 - [ ] `.lnk` shortcut support
 - [ ] Sync favorites and daily history
+- [ ] Friends: see what others are playing
+- [ ] Auto-update from GitHub Releases
 - [ ] Collections and tags
 - [ ] Controller-friendly "big screen" mode
 
 ## Credits
 
-Typeface: [Inter](https://rsms.me/inter/) by Rasmus Andersson, used under the SIL Open Font License (see `renderer/fonts/LICENSE-Inter.txt`). Cover art is fetched from Steam's public store for display in your own library; all artwork belongs to its respective owners. Zruxr isn't affiliated with or endorsed by Valve.
+Typeface: [Inter](https://rsms.me/inter/) by Rasmus Andersson, used under the SIL Open Font License (see `renderer/fonts/LICENSE-Inter.txt`). Cover art and the Discover row use Steam's public store data for display in your own library; all artwork belongs to its respective owners. Zruxr isn't affiliated with or endorsed by Valve.
+
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

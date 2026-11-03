@@ -5,6 +5,8 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { pathToFileURL } = require('url');
 const cloud = require('./cloud');
+const scanner = require('./scanner');
+const { createDiscover } = require('./discover');
 
 // ---------- Security: only trust paths the user picked in our own dialogs ----------
 // The renderer could be tricked (e.g. by an XSS bug) into asking us to run or copy
@@ -36,7 +38,7 @@ function saveLibrary(games) {
 
 // ---------- Settings ----------
 const settingsFile = () => path.join(dataDir(), 'settings.json');
-const DEFAULT_SETTINGS = { cardSize: 'medium', startupAnimation: true, startWithWindows: false, sort: 'name' };
+const DEFAULT_SETTINGS = { cardSize: 'medium', startupAnimation: true, startWithWindows: false, sort: 'name', showDiscover: true };
 
 function loadSettings() {
   try {
@@ -493,9 +495,7 @@ ipcMain.handle('dialog:pickCover', async () => {
   return res.filePaths[0];
 });
 
-ipcMain.handle('game:add', async (_e, { name, path: gamePath } = {}) => {
-  // Reject any path that didn't come from our own file dialog.
-  if (!isPicked(gamePath)) return withStatus(loadLibrary());
+async function addGameEntry(gamePath, name) {
   const icon = await getExeIcon(gamePath); // await first, then load+save with no gap
   const games = loadLibrary();
   const id = crypto.randomUUID();
@@ -513,8 +513,100 @@ ipcMain.handle('game:add', async (_e, { name, path: gamePath } = {}) => {
   });
   saveLibrary(games);
   queueCover(id); // runs in the background; the UI updates when it finishes
+  return id;
+}
+
+ipcMain.handle('game:add', async (_e, { name, path: gamePath } = {}) => {
+  // Reject any path that didn't come from our own file dialog.
+  if (!isPicked(gamePath)) return withStatus(loadLibrary());
+  await addGameEntry(gamePath, name);
   scheduleSync();
-  return withStatus(games);
+  return withStatus(loadLibrary());
+});
+
+// ---------- Scan this PC for games ----------
+// The scan runs here in the main process. Only paths this scan itself found can be added
+// afterwards, so the window can't use it to add arbitrary files.
+let scanRun = null; // { cancelled } while a scan is running
+let scanFound = new Map(); // exe path -> name, from the latest scan
+
+ipcMain.handle('scan:run', async (_e, mode) => {
+  if (scanRun) return { ok: false, error: 'A scan is already running.' };
+  if (!['quick', 'deep', 'folder'].includes(mode)) mode = 'quick';
+  let folder = null;
+  if (mode === 'folder') {
+    const res = await dialog.showOpenDialog(win, { title: 'Choose a folder to scan', properties: ['openDirectory'] });
+    if (res.canceled || !res.filePaths[0]) return { ok: true, canceled: true, results: [] };
+    folder = res.filePaths[0];
+  }
+  const state = { cancelled: false };
+  scanRun = state;
+  let lastSent = 0;
+  try {
+    const out = await scanner.scan({
+      mode,
+      folder,
+      cleanName: cleanGuess,
+      normalize,
+      isCancelled: () => state.cancelled,
+      onProgress: (p) => {
+        const now = Date.now();
+        if (now - lastSent < 150) return;
+        lastSent = now;
+        send('scan:progress', p);
+      },
+    });
+    const lib = loadLibrary();
+    const havePaths = new Set(lib.map((g) => String(g.path || '').toLowerCase()));
+    const haveNames = new Set(lib.map((g) => normalize(g.name)));
+    scanFound = new Map();
+    const results = out.results.map((r) => {
+      scanFound.set(r.path, r.name);
+      const already = havePaths.has(r.path.toLowerCase()) || haveNames.has(normalize(r.name));
+      return { ...r, already };
+    });
+    return { ok: true, results, truncated: out.truncated, cancelled: out.cancelled };
+  } catch (err) {
+    return { ok: false, error: `Scan failed: ${err.message}` };
+  } finally {
+    scanRun = null;
+  }
+});
+
+ipcMain.handle('scan:cancel', () => {
+  if (scanRun) scanRun.cancelled = true;
+  return true;
+});
+
+ipcMain.handle('scan:add', async (_e, paths) => {
+  if (!Array.isArray(paths)) return withStatus(loadLibrary());
+  const wanted = [...new Set(paths.filter((p) => typeof p === 'string' && scanFound.has(p)))].slice(0, 300);
+  const have = new Set(loadLibrary().map((g) => String(g.path || '').toLowerCase()));
+  for (const p of wanted) {
+    if (have.has(p.toLowerCase()) || !LAUNCHABLE_EXTS.has(path.extname(p).toLowerCase()) || !fs.existsSync(p)) continue;
+    await addGameEntry(p, scanFound.get(p));
+  }
+  scheduleSync();
+  return withStatus(loadLibrary());
+});
+
+// ---------- Discover (popular on Steam) ----------
+const discoverDir = () => path.join(dataDir(), 'discover');
+let discoverInstance = null;
+const getDiscover = () =>
+  (discoverInstance ||= createDiscover({
+    net,
+    dir: discoverDir(),
+    cacheFile: path.join(dataDir(), 'discover.json'),
+    downloadFirstImage,
+  }));
+
+ipcMain.handle('discover:get', (_e, force) => getDiscover().get(!!force));
+
+ipcMain.handle('discover:open', (_e, id) => {
+  const appId = Number(id);
+  if (Number.isInteger(appId) && appId > 0) shell.openExternal(`https://store.steampowered.com/app/${appId}`);
+  return true;
 });
 
 ipcMain.handle('game:update', async (_e, { id, name, path: gamePath, coverSrc, resetCover } = {}) => {
@@ -609,6 +701,7 @@ ipcMain.handle('settings:set', (_e, patch) => {
   if (['small', 'medium', 'large'].includes(patch.cardSize)) next.cardSize = patch.cardSize;
   if (['name', 'recent', 'played', 'added'].includes(patch.sort)) next.sort = patch.sort;
   if (typeof patch.startupAnimation === 'boolean') next.startupAnimation = patch.startupAnimation;
+  if (typeof patch.showDiscover === 'boolean') next.showDiscover = patch.showDiscover;
   if (typeof patch.startWithWindows === 'boolean') {
     next.startWithWindows = patch.startWithWindows;
     applyStartWithWindows(patch.startWithWindows);
@@ -804,7 +897,8 @@ app.whenReady().then(() => {
   protocol.handle('cover', (request) => {
     const url = new URL(request.url);
     const fileName = path.basename(decodeURIComponent(url.pathname));
-    const full = path.join(coversDir(), fileName);
+    const dir = url.hostname === 'discover' ? discoverDir() : coversDir(); // cover://discover/<file> = Discover thumbnails
+    const full = path.join(dir, fileName);
     return net.fetch(pathToFileURL(full).toString());
   });
   createWindow();

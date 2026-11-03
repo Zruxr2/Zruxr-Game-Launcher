@@ -58,11 +58,25 @@
                 <option value="added">Recently added</option>
               </select>
             </div>
+            <button id="scanBtn" class="btn" title="Find games installed on this PC">Scan PC</button>
             <button id="addBtn" class="btn primary">Add game</button>
           </div>
         </section>
 
         <section id="featured" class="featured rise" data-rise="3" hidden></section>
+
+        <section id="discover" class="discover rise" data-rise="3" hidden>
+          <div class="discover-head">
+            <div class="discover-label">Discover</div>
+            <div class="discover-tabs" id="discoverTabs" role="tablist" aria-label="Discover lists"></div>
+            <div class="discover-ctrl">
+              <button type="button" class="dnav" id="discoverPrev" aria-label="Scroll left"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+              <button type="button" class="dnav" id="discoverNext" aria-label="Scroll right"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+              <button type="button" class="link" id="discoverHide">Hide</button>
+            </div>
+          </div>
+          <div class="discover-row" id="discoverRow"></div>
+        </section>
 
         <section id="libraryBlock" class="rise" data-rise="4">
           <div class="section-head">
@@ -79,8 +93,11 @@
 
         <section id="empty" class="empty rise" data-rise="3" hidden>
           <h2>Nothing here yet.</h2>
-          <p>Add a game by choosing its .exe file. Cover art is found automatically.</p>
-          <button id="emptyAddBtn" class="btn primary">Add your first game</button>
+          <p>Scan this PC to find your installed games, or add one by choosing its .exe file. Cover art is found automatically.</p>
+          <div class="empty-actions">
+            <button id="emptyScanBtn" class="btn primary">Scan this PC for games</button>
+            <button id="emptyAddBtn" class="btn">Add one by hand</button>
+          </div>
         </section>
       </div>
 
@@ -160,6 +177,13 @@
                 </div>
                 <label class="switch"><input type="checkbox" id="optSplash" /><span></span></label>
               </div>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-name">Show Discover on home</div>
+                  <div class="setting-desc">A slim row of popular Steam games above your library.</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="optDiscover" /><span></span></label>
+              </div>
             </div>
           </section>
 
@@ -186,6 +210,13 @@
           <section class="setting-group">
             <h3>Library</h3>
             <div class="setting-card">
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-name">Scan for games</div>
+                  <div class="setting-desc">Find games installed on this PC and add them in one go.</div>
+                </div>
+                <button type="button" class="btn" id="scanNow">Scan PC</button>
+              </div>
               <div class="setting-row">
                 <div class="setting-text">
                   <div class="setting-name">Find missing covers</div>
@@ -286,6 +317,49 @@
         <button type="submit" id="saveBtn" class="btn primary">Save</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Scan for games -->
+  <dialog id="scanDialog" class="scan-dialog">
+    <button type="button" id="scanClose" class="card-close" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <h2>Scan for games</h2>
+
+    <div id="scanChoose">
+      <p class="scan-lead">Zruxr only reads folder and file names. Nothing is changed or uploaded.</p>
+      <button type="button" class="scan-opt" data-mode="quick">
+        <strong>Quick scan</strong>
+        <span>Steam, Epic, GOG and your Games folders on every drive. Takes a few seconds.</span>
+      </button>
+      <button type="button" class="scan-opt" data-mode="deep">
+        <strong>Whole PC</strong>
+        <span>Searches every drive for game folders. Slower, it can take a few minutes.</span>
+      </button>
+      <button type="button" class="scan-opt" data-mode="folder">
+        <strong>Pick a folder&hellip;</strong>
+        <span>Scan just one folder, for example D:\Games.</span>
+      </button>
+    </div>
+
+    <div id="scanBusy" hidden>
+      <div class="scan-spinner" aria-hidden="true"></div>
+      <p class="scan-status" id="scanStatus">Starting&hellip;</p>
+      <div class="actions"><button type="button" id="scanCancel" class="btn">Stop</button></div>
+    </div>
+
+    <div id="scanResults" hidden>
+      <div class="scan-toolbar">
+        <span id="scanSummary"></span>
+        <span class="scan-pick"><button type="button" class="link" id="scanAll">Select all</button><button type="button" class="link" id="scanNone">None</button></span>
+      </div>
+      <div id="scanList" class="scan-list"></div>
+      <p class="field-note" id="scanNote" hidden></p>
+      <div class="actions">
+        <button type="button" id="scanAgain" class="btn ghost">Scan again</button>
+        <button type="button" id="scanAdd" class="btn primary">Add games</button>
+      </div>
+    </div>
   </dialog>
 
   <script src="renderer.js"></script>
