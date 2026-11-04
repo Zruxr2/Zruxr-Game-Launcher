@@ -10,7 +10,7 @@
 - Sort options, favorites, search shortcut and cover glow.
 - Settings: cover size, start with Windows, startup animation, Discover toggle.
 
-- ## 1.2.1
+## 1.2.1
 - Lowkey forgot
 
 ## 1.2.2
