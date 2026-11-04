@@ -16,7 +16,8 @@ A fast, dark game launcher for Windows. Point it at any `.exe` and Zruxr finds t
 
 <br />
 
-<img src="docs/library.png" alt="Zruxr library view" width="900" />
+![Uploading Screenshot 2026-11-04 005022.png…]()
+
 
 </div>
 
