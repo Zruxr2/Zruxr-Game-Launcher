@@ -50,20 +50,20 @@ Most launchers want you to buy things. Zruxr doesn't sell anything. It's for the
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/setup.png" alt="Zruxr easy setup installer" /></td>
     <td width="50%"><img src="docs/scan.png" alt="Scanning for installed games" /></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>Easy setup</sub></td>
-    <td align="center"><sub>Scan PC finds your installed games</sub></td>
-  </tr>
-  <tr>
     <td width="50%"><img src="docs/stats.png" alt="Stats tab" /></td>
-    <td width="50%"><img src="docs/settings.png" alt="Settings tab" /></td>
   </tr>
   <tr>
+    <td align="center"><sub>Scan PC finds your installed games</sub></td>
     <td align="center"><sub>Stats</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/settings.png" alt="Settings tab" /></td>
+    <td></td>
+  </tr>
+  <tr>
     <td align="center"><sub>Settings</sub></td>
+    <td></td>
   </tr>
 </table>
 

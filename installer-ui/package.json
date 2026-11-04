@@ -1,0 +1,47 @@
+{
+  "name": "zruxr-setup",
+  "productName": "Zruxr Installer",
+  "version": "1.2.3",
+  "description": "Animated installer for Zruxr",
+  "author": "Zruxr",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "demo": "electron . --demo",
+    "build": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.zruxr.installer",
+    "productName": "Zruxr Installer",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "build/icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "payload/core.exe",
+        "to": "payload/core.exe"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        "portable"
+      ],
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "portable": {
+      "artifactName": "Zruxr-Installer-${version}.exe"
+    }
+  }
+}

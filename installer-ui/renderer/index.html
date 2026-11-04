@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'; script-src 'self'" />
+  <title>Zruxr Installer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="card" id="card">
+    <canvas id="fx"></canvas>
+    <div class="glow"></div>
+
+    <header class="top">
+      <span class="top-title">Zruxr Setup</span>
+      <div class="wc">
+        <button id="min" aria-label="Minimize">&#8211;</button>
+        <button id="close" aria-label="Close">&#10005;</button>
+      </div>
+    </header>
+
+    <div class="logo-wrap" id="logo">
+      <span class="pulse"></span>
+      <svg class="ring" viewBox="0 0 140 140" aria-hidden="true">
+        <circle class="dash" cx="70" cy="70" r="66" />
+        <circle class="track" cx="70" cy="70" r="58" />
+        <circle class="arc" id="arc" cx="70" cy="70" r="58" transform="rotate(-90 70 70)" />
+      </svg>
+      <svg class="mark" viewBox="124 140 282 244" aria-hidden="true">
+        <path fill="currentColor" d="M133 150H383V207L222 305H383V362H133V305L294 207H133Z" />
+        <circle class="dot" cx="369" cy="348" r="30" fill="#a3a3a3" />
+      </svg>
+    </div>
+
+    <section class="view on" id="v-welcome">
+      <h1 class="title" id="title" aria-label="Zruxr"></h1>
+      <p class="sub rise" style="--d:1.0s">A simple launcher for your own game files.</p>
+      <div class="path-row rise" style="--d:1.15s">
+        <span id="path" title=""></span>
+        <button id="browse">Change</button>
+      </div>
+      <button class="btn primary rise" style="--d:1.3s" id="install">Install</button>
+      <p class="ver rise" style="--d:1.45s" id="ver"></p>
+    </section>
+
+    <section class="view" id="v-install">
+      <div class="pct"><span id="pct">0</span><span class="sign">%</span></div>
+      <div class="status" id="status">Warming up the engines</div>
+      <div class="note">Installing to <span id="dirNote"></span></div>
+    </section>
+
+    <section class="view" id="v-done">
+      <h2 class="h2">You're all set</h2>
+      <p class="sub">Zruxr is installed and ready to go.</p>
+      <div class="row">
+        <button class="btn primary" id="launch">Launch Zruxr</button>
+        <button class="btn ghost" id="finish">Close</button>
+      </div>
+    </section>
+
+    <section class="view" id="v-error">
+      <h2 class="h2 bad">Something went wrong</h2>
+      <p class="sub" id="errMsg"></p>
+      <div class="row">
+        <button class="btn primary" id="retry">Try again</button>
+        <button class="btn ghost" id="quit">Close</button>
+      </div>
+    </section>
+
+    <div class="bar" id="bar"></div>
+  </div>
+  <script src="setup.js"></script>
+</body>
+</html>
