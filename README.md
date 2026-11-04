@@ -16,7 +16,7 @@ A fast, dark game launcher for Windows. Point it at any `.exe` and Zruxr finds t
 
 <br />
 
-<img width="1169" height="773" alt="image" src="https://github.com/user-attachments/assets/1a4b2d2e-e17a-4472-b356-f88a4cd18e3f" />
+<img src="docs/library.png" alt="Zruxr library view" width="900" />
 
 </div>
 
@@ -40,6 +40,8 @@ Most launchers want you to buy things. Zruxr doesn't sell anything. It's for the
 
 **Stats you'll actually look at.** Total hours, this week's hours, a 7-day chart and your most played games.
 
+**Updates itself.** The installed version checks GitHub Releases, downloads new versions in the background and installs them when you close Zruxr.
+
 **Accounts are optional.** Zruxr works fully without one. If you do create a free account, your game list and play time follow you between PCs.
 
 **Yours to tweak.** Small, medium or large covers, start with Windows, and a startup animation you can turn off.
@@ -48,14 +50,20 @@ Most launchers want you to buy things. Zruxr doesn't sell anything. It's for the
 
 <table>
   <tr>
-    <td width="33%"><img src="docs/scan.png" alt="Scanning for installed games" /></td>
-    <td width="33%"><img src="docs/stats.png" alt="Stats tab" /></td>
-    <td width="33%"><img src="docs/settings.png" alt="Settings tab" /></td>
+    <td width="50%"><img src="docs/scan.png" alt="Scanning for installed games" /></td>
+    <td width="50%"><img src="docs/stats.png" alt="Stats tab" /></td>
   </tr>
   <tr>
     <td align="center"><sub>Scan PC finds your installed games</sub></td>
     <td align="center"><sub>Stats</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/settings.png" alt="Settings tab" /></td>
+    <td></td>
+  </tr>
+  <tr>
     <td align="center"><sub>Settings</sub></td>
+    <td></td>
   </tr>
 </table>
 
@@ -68,7 +76,7 @@ Grab the latest build from the [**Releases**](../../releases/latest) page:
 | File | What it is |
 | --- | --- |
 | `Zruxr-Portable-x.y.z.exe` | One file. Double-click to run, no install. |
-| `Zruxr-Setup-x.y.z.exe` | Installer with Start menu and desktop shortcuts, plus an uninstaller. |
+| `Zruxr-Setup-x.y.z.exe` | Installer with Start menu and desktop shortcuts, plus an uninstaller. Updates itself. |
 
 Windows SmartScreen may warn about an unknown publisher because the app isn't code-signed. Choose **More info**, then **Run anyway**.
 
@@ -108,9 +116,10 @@ The app icon is `build/icon.png`. Swap it for your own image (at least 256 x 256
 <details>
 <summary><b>If Electron says it "failed to install correctly"</b></summary>
 
-Electron downloads its binary in a post-install step, which some setups block (for example `--ignore-scripts` or a restrictive npm config). Re-run it manually:
+Newer versions of npm block install scripts by default, which stops Electron from downloading its binary. Approve the script and rebuild:
 
 ```bash
+npm install-scripts approve electron
 npm rebuild electron
 ```
 
@@ -120,7 +129,7 @@ If that still doesn't work, delete `node_modules` and run `npm install` again.
 
 ## Accounts and sync
 
-An account is completely optional. Zruxr asks once when it opens, and you can click **Not now** to use everything offline. Accounts use [Supabase](https://supabase.com). People sign in with a username and password, and the app handles the rest. Sign-in sessions are stored encrypted with Windows' own credential protection, so you stay signed in between launches.
+An account is completely optional. Zruxr asks once when it opens, and you can click **Not now** to use everything offline. Accounts use [Supabase](https://supabase.com). People sign in with a username and password, and the app handles the rest. Sign-in sessions are stored encrypted with Windows' own credential protection, so you stay signed in between launches. There is no email on an account, so there is no password reset: a forgotten password can't be recovered.
 
 If you fork this and want your own backend, create a Supabase project, then replace `SUPABASE_URL` and `ANON_KEY` at the top of `cloud.js`. The anon key is designed to be public, but make sure Row Level Security is switched on for your tables so users can only read and write their own library.
 
@@ -142,17 +151,19 @@ If you fork this and want your own backend, create a Supabase project, then repl
 - [ ] `.lnk` shortcut support
 - [ ] Sync favorites and daily history
 - [ ] Friends: see what others are playing
-- [ ] Auto-update from GitHub Releases
+- [x] Auto-update from GitHub Releases (installed version only)
 - [ ] Collections and tags
 - [ ] Controller-friendly "big screen" mode
+
+## Auto-update
+
+The installed version (`Zruxr-Setup-x.y.z.exe`) checks GitHub Releases on start and every few hours, downloads new versions in the background and installs them when Zruxr closes (or right away via **Restart now**). The portable `.exe` doesn't update itself.
+
+To publish an update: bump `version` in `package.json`, run `npm run dist`, then create a GitHub release tagged `vX.Y.Z` and attach **all** of these from `dist/`: `Zruxr-Setup-X.Y.Z.exe`, `Zruxr-Setup-X.Y.Z.exe.blockmap`, `latest.yml` (and the portable `.exe` if you want). Without `latest.yml` installed copies can't see the update.
 
 ## Credits
 
 Typeface: [Inter](https://rsms.me/inter/) by Rasmus Andersson, used under the SIL Open Font License (see `renderer/fonts/LICENSE-Inter.txt`). Cover art and the Discover row use Steam's public store data for display in your own library; all artwork belongs to its respective owners. Zruxr isn't affiliated with or endorsed by Valve.
-
-## Contributing
-
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

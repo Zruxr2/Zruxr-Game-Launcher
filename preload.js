@@ -34,5 +34,9 @@ contextBridge.exposeInMainWorld('launcher', {
   pickAvatar: () => ipcRenderer.invoke('profile:pickAvatar'),
   removeAvatar: () => ipcRenderer.invoke('profile:removeAvatar'),
   onAccountChanged: (cb) => ipcRenderer.on('account:changed', (_e, state) => cb(state)),
+  getUpdate: () => ipcRenderer.invoke('update:state'),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdate: (cb) => ipcRenderer.on('update:status', (_e, s) => cb(s)),
   onLaunchError: (cb) => ipcRenderer.on('launch:error', (_e, msg) => cb(msg)),
 });

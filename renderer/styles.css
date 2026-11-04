@@ -866,6 +866,23 @@ dialog input:focus { outline: none; border-color: #8a8a8a; }
 }
 .toast.info { border-left-color: #fff; }
 
+/* ---------- Update bar ---------- */
+.update-bar {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 290;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px 10px 16px;
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.update-bar .link { font-size: 13px; }
+
 /* =====================================================================
    Motion
    ===================================================================== */
@@ -1010,6 +1027,8 @@ dialog[open]::backdrop { animation: fadeIn .3s ease both; }
 .auth-form input:focus { outline: none; border-color: #8a8a8a; }
 .auth-msg { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--danger); }
 .auth-msg.info { color: var(--muted); }
+.auth-note { margin: 0; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.auth-note.strong { padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel); color: var(--text); }
 .auth-toggle { align-self: center; margin-top: 2px; }
 .auth-toggle:hover { text-decoration: none; color: var(--text); }
 

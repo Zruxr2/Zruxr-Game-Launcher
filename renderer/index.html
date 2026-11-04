@@ -260,6 +260,7 @@
                 <form id="authForm" class="auth-form" novalidate>
                   <input type="text" id="authEmail" placeholder="Username" autocomplete="username" maxlength="20" spellcheck="false" autocapitalize="off" />
                   <input type="password" id="authPass" placeholder="Password" autocomplete="current-password" />
+                  <p id="authNote" class="auth-note"></p>
                   <p id="authMsg" class="auth-msg" hidden></p>
                   <button type="submit" id="authSubmit" class="btn primary wide">Sign in</button>
                   <button type="button" id="authToggle" class="link auth-toggle">New here? Create an account</button>
@@ -284,6 +285,11 @@
     </div>
   </div>
 
+  <div id="updateBar" class="update-bar" role="status" hidden>
+    <span id="updateText"></span>
+    <button type="button" id="updateNow" class="btn sm primary">Restart now</button>
+    <button type="button" id="updateLater" class="link">Later</button>
+  </div>
   <div id="toast" class="toast" hidden></div>
 
   <!-- Add / Edit dialog -->

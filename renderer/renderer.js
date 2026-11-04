@@ -32,6 +32,7 @@ const authSubmit = document.getElementById('authSubmit');
 const authToggle = document.getElementById('authToggle');
 const authTitle = document.getElementById('authTitle');
 const authSub = document.getElementById('authSub');
+const authNote = document.getElementById('authNote');
 const accountAvatar = document.getElementById('accountAvatar');
 const accountEmail = document.getElementById('accountEmail');
 const accountSync = document.getElementById('accountSync');
@@ -648,6 +649,10 @@ function setAuthMode(mode) {
   authSubmit.textContent = up ? 'Create account' : 'Sign in';
   authToggle.textContent = up ? 'Have an account? Sign in' : 'New here? Create an account';
   authPass.autocomplete = up ? 'new-password' : 'current-password';
+  authNote.textContent = up
+    ? "Your password is stored as a one-way hash, so nobody can read it. There's no email, so there's no password reset either. If you forget it, the account can't be recovered. Keep it somewhere safe."
+    : "Forgot your password? There's no email on the account, so it can't be reset.";
+  authNote.classList.toggle('strong', up);
   hideAuthMsg();
 }
 
@@ -1164,6 +1169,8 @@ async function boot() {
     render();
   });
   window.launcher.onLaunchError(showToast);
+  window.launcher.getUpdate().then(showUpdate).catch(() => {});
+  window.launcher.onUpdate(showUpdate);
   window.launcher.onAccountChanged((state) => {
     account = state;
     renderAccount();
@@ -1215,3 +1222,21 @@ async function boot() {
 }
 
 boot();
+
+
+// ---------- Auto-update ----------
+const updateBar = document.getElementById('updateBar');
+let updateDismissed = false;
+function showUpdate(u) {
+  if (!u || u.status !== 'ready') {
+    updateBar.hidden = true;
+    return;
+  }
+  document.getElementById('updateText').textContent = `Zruxr ${u.version} is ready to install.`;
+  updateBar.hidden = updateDismissed;
+}
+document.getElementById('updateNow').addEventListener('click', () => window.launcher.installUpdate());
+document.getElementById('updateLater').addEventListener('click', () => {
+  updateDismissed = true; // it still installs by itself the next time Zruxr closes
+  updateBar.hidden = true;
+});

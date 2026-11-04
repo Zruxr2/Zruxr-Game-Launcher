@@ -1,35 +1,16 @@
 {
   "name": "zruxr",
   "productName": "Zruxr",
-  "version": "1.2.0",
+  "version": "1.2.3",
   "description": "Zruxr - a simple launcher for your own game files.",
   "author": "Zruxr",
-  "license": "MIT",
-  "private": true,
   "main": "main.js",
-  "homepage": "https://github.com/OWNER/REPO#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/OWNER/REPO.git"
-  },
-  "bugs": {
-    "url": "https://github.com/OWNER/REPO/issues"
-  },
-  "keywords": [
-    "game-launcher",
-    "electron",
-    "windows",
-    "library",
-    "playtime-tracker"
-  ],
-  "engines": {
-    "node": ">=18"
-  },
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win nsis portable",
     "dist:setup": "electron-builder --win nsis",
-    "dist:portable": "electron-builder --win portable"
+    "dist:portable": "electron-builder --win portable",
+    "release": "electron-builder --win nsis portable --publish never"
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -46,6 +27,7 @@
       "main.js",
       "preload.js",
       "cloud.js",
+      "updater.js",
       "scanner.js",
       "discover.js",
       "renderer/**/*",
@@ -66,6 +48,16 @@
     },
     "portable": {
       "artifactName": "Zruxr-Portable-${version}.${ext}"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Zruxr2",
+        "repo": "Zruxr-Launcher"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
   }
 }

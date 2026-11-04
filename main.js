@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { pathToFileURL } = require('url');
 const cloud = require('./cloud');
 const scanner = require('./scanner');
+const updater = require('./updater');
 const { createDiscover } = require('./discover');
 
 // ---------- Security: only trust paths the user picked in our own dialogs ----------
@@ -904,6 +905,7 @@ app.whenReady().then(() => {
   createWindow();
 
   cloud.init();
+  updater.init(send);
   accountState.email = cloud.email();
   if (cloud.isSignedIn()) setTimeout(runSync, 2500); // after the splash has finished
 
