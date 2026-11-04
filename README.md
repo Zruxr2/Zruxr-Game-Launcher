@@ -8,8 +8,7 @@
 
 A fast, dark game launcher for Windows. Point it at any `.exe` and Zruxr finds the cover art, tracks your play time, and keeps your library looking sharp.
 
-<img width="1156" height="769" alt="image" src="https://github.com/user-attachments/assets/eade2f47-9104-472e-ae69-32db0f72dc90" />
-
+[![Download](https://img.shields.io/badge/Download-latest%20release-f0f0f0?style=for-the-badge&labelColor=0a0a0a)](../../releases/latest)
 
 ![Platform](https://img.shields.io/badge/platform-Windows-8d8d8d?style=flat-square&labelColor=0a0a0a)
 ![Electron](https://img.shields.io/badge/built%20with-Electron-8d8d8d?style=flat-square&labelColor=0a0a0a)
@@ -17,7 +16,7 @@ A fast, dark game launcher for Windows. Point it at any `.exe` and Zruxr finds t
 
 <br />
 
-<img src="docs/library.png" alt="Zruxr library view" width="900" />
+<img width="1166" height="762" alt="image" src="https://github.com/user-attachments/assets/38d9182e-1f7b-4411-a12f-9a1c9cc7a0f3" />
 
 </div>
 
