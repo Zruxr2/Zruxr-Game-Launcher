@@ -7,9 +7,10 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis portable",
+    "dist": "node scripts/build-installer.js",
     "dist:setup": "electron-builder --win nsis",
     "dist:portable": "electron-builder --win portable",
+    "dist:old": "electron-builder --win nsis portable",
     "release": "electron-builder --win nsis portable --publish never"
   },
   "devDependencies": {

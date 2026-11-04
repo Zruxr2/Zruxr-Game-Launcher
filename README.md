@@ -16,8 +16,7 @@ A fast, dark game launcher for Windows. Point it at any `.exe` and Zruxr finds t
 
 <br />
 
-<img width="1169" height="773" alt="Screenshot 2026-11-04 005022" src="https://github.com/user-attachments/assets/06043a22-d858-4814-b6a3-1b2378bbfdda" />
-
+<img src="docs/library.png" alt="Zruxr library view" width="900" />
 
 </div>
 
@@ -60,9 +59,11 @@ Most launchers want you to buy things. Zruxr doesn't sell anything. It's for the
   </tr>
   <tr>
     <td width="50%"><img src="docs/settings.png" alt="Settings tab" /></td>
+    <td></td>
   </tr>
   <tr>
     <td align="center"><sub>Settings</sub></td>
+    <td></td>
   </tr>
 </table>
 
