@@ -9,3 +9,11 @@
 - Automatic cover art with a generated fallback, re-checked weekly.
 - Sort options, favorites, search shortcut and cover glow.
 - Settings: cover size, start with Windows, startup animation, Discover toggle.
+
+## 1.2.2
+Scan PC: Zruxr can scan your PC for games and add them to your library, so you don't have to add each one by hand.
+Accounts are optional: you can use Zruxr without signing in or creating an account. Signing in is still there if you want your library to sync between PCs.
+
+## 1.2.3
+Sign-up note: the create account screen now shows a note for new users.
+Auto update: Zruxr can now update itself, so you no longer have to download and install new versions by hand.
