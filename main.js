@@ -8,6 +8,7 @@ const cloud = require('./cloud');
 const scanner = require('./scanner');
 const updater = require('./updater');
 const { createDiscover } = require('./discover');
+const sources = require('./sources');
 
 // ---------- Security: only trust paths the user picked in our own dialogs ----------
 // The renderer could be tricked (e.g. by an XSS bug) into asking us to run or copy
@@ -39,7 +40,7 @@ function saveLibrary(games) {
 
 // ---------- Settings ----------
 const settingsFile = () => path.join(dataDir(), 'settings.json');
-const DEFAULT_SETTINGS = { cardSize: 'medium', startupAnimation: true, startWithWindows: false, sort: 'name', showDiscover: true };
+const DEFAULT_SETTINGS = { cardSize: 'medium', startupAnimation: true, startWithWindows: false, sort: 'name', showDiscover: true, showDownloads: true, promoDismissed: false, downloadDir: '' };
 
 function loadSettings() {
   try {
@@ -703,6 +704,9 @@ ipcMain.handle('settings:set', (_e, patch) => {
   if (['name', 'recent', 'played', 'added'].includes(patch.sort)) next.sort = patch.sort;
   if (typeof patch.startupAnimation === 'boolean') next.startupAnimation = patch.startupAnimation;
   if (typeof patch.showDiscover === 'boolean') next.showDiscover = patch.showDiscover;
+  if (typeof patch.showDownloads === 'boolean') next.showDownloads = patch.showDownloads;
+  if (typeof patch.promoDismissed === 'boolean') next.promoDismissed = patch.promoDismissed;
+  if (typeof patch.downloadDir === 'string' && path.isAbsolute(patch.downloadDir)) next.downloadDir = patch.downloadDir;
   if (typeof patch.startWithWindows === 'boolean') {
     next.startWithWindows = patch.startWithWindows;
     applyStartWithWindows(patch.startWithWindows);
@@ -906,6 +910,34 @@ app.whenReady().then(() => {
 
   cloud.init();
   updater.init(send);
+  sources.init({
+    send,
+    dataDir,
+    getDownloadDir: () => loadSettings().downloadDir || path.join(dataDir(), 'Games'), // default: inside the launcher's own folder
+    setDownloadDir: (dir) => {
+      const next = { ...loadSettings(), downloadDir: dir };
+      fs.writeFileSync(settingsFile(), JSON.stringify(next, null, 2));
+    },
+    allowPath: (p) => pickedPaths.add(p),
+    getWindow: () => win,
+    // Called by the downloader when a game finishes downloading/unpacking: adds it to the library
+    // (skips it if that exact file is already there).
+    addGame: async (gamePath, name) => {
+      const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+      if (loadLibrary().some((g) => same(g.path, gamePath))) return true;
+      pickedPaths.add(gamePath);
+      await addGameEntry(gamePath, name);
+      scheduleSync();
+      pushLibrary();
+      return true;
+    },
+    findCover: findCoverImage,
+    searchSteam,
+    coverUrlsFor,
+    downloadFirstImage,
+    coversDir,
+    computeTint,
+  });
   accountState.email = cloud.email();
   if (cloud.isSignedIn()) setTimeout(runSync, 2500); // after the splash has finished
 

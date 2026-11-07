@@ -1,5 +1,5 @@
 Copy your real NSIS installer into this folder and rename it to:  core.exe
 
-  Zruxr-Launcher\dist\Zruxr-Setup-1.2.3.exe   ->   payload\core.exe
+  Zruxr-Launcher\dist\Zruxr-Setup-<version>.exe   ->   payload\core.exe
 
 (Build it first with:  npm run dist:setup  in the launcher project.)

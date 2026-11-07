@@ -1,7 +1,7 @@
 {
   "name": "zruxr-setup",
   "productName": "Zruxr Installer",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Animated installer for Zruxr",
   "author": "Zruxr",
   "main": "main.js",

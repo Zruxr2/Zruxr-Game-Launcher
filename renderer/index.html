@@ -21,6 +21,7 @@
 
       <nav class="tabs rise" data-rise="1" id="tabs" role="tablist" aria-label="Sections">
         <button class="tab active" role="tab" aria-selected="true" data-tab="library">Library</button>
+        <button class="tab" id="dlTab" role="tab" aria-selected="false" data-tab="downloads" hidden>Downloads<span class="tab-count" id="dlCount" hidden></span></button>
         <button class="tab" role="tab" aria-selected="false" data-tab="favorites">Favorites<span class="tab-count" id="favCount" hidden></span></button>
         <button class="tab" role="tab" aria-selected="false" data-tab="stats">Stats</button>
         <button class="tab" role="tab" aria-selected="false" data-tab="friends">Friends</button>
@@ -58,8 +59,29 @@
                 <option value="added">Recently added</option>
               </select>
             </div>
+            <button id="dlShowBtn" class="btn" hidden>Downloads</button>
             <button id="scanBtn" class="btn" title="Find games installed on this PC">Scan PC</button>
+            <button id="sourceBtn" class="btn" title="Add a website to download games from">Add source</button>
             <button id="addBtn" class="btn primary">Add game</button>
+          </div>
+        </section>
+
+        <section id="sourcePromo" class="promo rise" data-rise="3" hidden>
+          <div class="promo-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>
+          </div>
+          <div class="promo-text">
+            <h2>Want to download games?</h2>
+            <p>Add a <strong>source</strong>, a web address that lists games or files. Zruxr shows every game with cover art and a big Download button.</p>
+            <ol class="promo-steps">
+              <li><span>1</span><i>Press <b>Add a source</b></i></li>
+              <li><span>2</span><i>Paste the web address</i></li>
+              <li><span>3</span><i>Pick a game in the <b>Downloads</b> tab</i></li>
+            </ol>
+          </div>
+          <div class="promo-actions">
+            <button type="button" class="btn primary lg" id="promoAdd">Add a source</button>
+            <button type="button" class="link" id="promoDismiss">Not now</button>
           </div>
         </section>
 
@@ -97,8 +119,58 @@
           <div class="empty-actions">
             <button id="emptyScanBtn" class="btn primary">Scan this PC for games</button>
             <button id="emptyAddBtn" class="btn">Add one by hand</button>
+            <button id="emptySourceBtn" class="btn">Add a source to download games</button>
           </div>
         </section>
+      </div>
+
+      <!-- ================= Downloads ================= -->
+      <div id="pageDownloads" class="page" hidden>
+        <section class="page-head">
+          <h1>Downloads</h1>
+          <p class="stats" id="dlSub">Games from your sources</p>
+          <div class="dl-beta" role="note">
+            <span class="beta-pill">Beta</span>
+            <div><strong>Downloads are in beta.</strong> Things can break or fail, and some games may not download. If one doesn't work, try another host or try again later.</div>
+          </div>
+        </section>
+
+        <section id="dlSection" class="dls">
+          <div class="discover-head">
+            <div class="discover-tabs" id="dlTabs" role="tablist" aria-label="Sources"></div>
+            <div class="discover-ctrl">
+              <button type="button" class="link" id="dlManage">Sources</button>
+              <button type="button" class="link" id="dlHide">Hide tab</button>
+            </div>
+          </div>
+
+          <div id="dlActive" class="dl-active" hidden></div>
+
+          <div class="dl-tools">
+            <label class="search dl-search" for="dlSearch">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+              <input id="dlSearch" type="text" placeholder="Search downloads" autocomplete="off" spellcheck="false" />
+              <span class="dl-count" id="dlTotal"></span>
+            </label>
+            <label class="dl-sort" for="dlSort">
+              <span>Sort by</span>
+              <select id="dlSort" aria-label="Sort downloads">
+                <option value="default">Source order</option>
+                <option value="az">Name A to Z</option>
+                <option value="za">Name Z to A</option>
+                <option value="big">Largest first</option>
+                <option value="small">Smallest first</option>
+                <option value="new">Newest first</option>
+                <option value="old">Oldest first</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="dlGrid" class="grid dl-grid"></div>
+          <p id="dlNone" class="no-results" hidden>Nothing matches your search.</p>
+          <div class="dl-more-wrap"><button type="button" class="btn" id="dlMore" hidden>Show more</button></div>
+        </section>
+
       </div>
 
       <!-- ================= Stats ================= -->
@@ -179,6 +251,13 @@
               </div>
               <div class="setting-row">
                 <div class="setting-text">
+                  <div class="setting-name">Show Downloads on home</div>
+                  <div class="setting-desc">The games from your sources, with a download button on each.</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="optDownloads" /><span></span></label>
+              </div>
+              <div class="setting-row">
+                <div class="setting-text">
                   <div class="setting-name">Show Discover on home</div>
                   <div class="setting-desc">A slim row of popular Steam games above your library.</div>
                 </div>
@@ -223,6 +302,20 @@
                   <div class="setting-desc">Look up cover art again for games that don't have any.</div>
                 </div>
                 <button type="button" class="btn" id="refreshCovers">Search now</button>
+              </div>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-name">Download folder</div>
+                  <div class="setting-desc path" id="dlPath">&hellip;</div>
+                </div>
+                <button type="button" class="btn" id="pickDlDir">Change</button>
+              </div>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-name">Updates</div>
+                  <div class="setting-desc" id="updateDesc">&hellip;</div>
+                </div>
+                <button type="button" class="btn" id="checkUpdate">Check now</button>
               </div>
               <div class="setting-row">
                 <div class="setting-text">
@@ -287,7 +380,7 @@
 
   <div id="updateBar" class="update-bar" role="status" hidden>
     <span id="updateText"></span>
-    <button type="button" id="updateNow" class="btn sm primary">Restart now</button>
+    <button type="button" id="updateNow" class="btn sm primary" hidden>Restart now</button>
     <button type="button" id="updateLater" class="link">Later</button>
   </div>
   <div id="toast" class="toast" hidden></div>
@@ -323,6 +416,72 @@
         <button type="submit" id="saveBtn" class="btn primary">Save</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Add a source -->
+  <dialog id="sourceDialog" class="source-dialog">
+    <button type="button" id="sourceClose" class="card-close" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <h2>Add a source</h2>
+    <p class="scan-lead">Paste a web address. Zruxr lists every game or file it links to, and you can download them from the home page.</p>
+    <form id="srcForm" class="src-form" novalidate>
+      <input type="text" id="srcUrl" placeholder="https://..." autocomplete="off" spellcheck="false" />
+      <button type="submit" id="srcAddBtn" class="btn primary">Add</button>
+    </form>
+    <p class="src-msg" id="srcMsg" hidden></p>
+    <p class="field-note">Works with a JSON list, a web page or open folder that links to files, or a direct file link. Only add sources you trust and have the right to download from.</p>
+    <div id="srcList" class="src-list"></div>
+  </dialog>
+
+  <!-- A host's page (Gofile, FileKeeper, ...) shown inside the launcher; the page itself is drawn by the app over the body of this card -->
+  <div id="hostPanel" class="host-panel" hidden>
+    <div class="host-card" role="dialog" aria-modal="true" aria-labelledby="hostTitle">
+      <div class="host-head">
+       <div class="host-row">
+        <div class="host-info">
+          <div class="host-title" id="hostTitle"></div>
+          <div class="host-sub" id="hostSub"></div>
+        </div>
+        <div class="host-links" id="hostLinks" role="group" aria-label="Download host"></div>
+        <div class="host-actions">
+          <button type="button" class="btn ghost small" id="hostBrowser" title="Open this page in your normal browser">Open in browser</button>
+          <button type="button" class="btn ghost small" id="hostAdopt" title="Pick a file you downloaded yourself">I downloaded it</button>
+          <button type="button" class="host-x" id="hostClose" aria-label="Close and cancel" title="Close and cancel (Esc)">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+       </div>
+       <div class="host-hint" id="hostHint" role="status" aria-live="polite">
+         <span class="hint-text" id="hostHintText"></span>
+         <span class="beta-pill big" title="Downloads are in beta, so things can still go wrong. If a host does not work, try another one.">Beta · may not work</span>
+       </div>
+      </div>
+      <div class="host-loading" aria-hidden="true"><span></span></div>
+    </div>
+  </div>
+
+  <!-- Choose where a download is saved -->
+  <dialog id="saveDialog" class="save-dialog">
+    <h2>Download game</h2>
+    <p class="scan-lead" id="saveTitle"></p>
+    <div id="saveHostsRow">
+      <label>Download from</label>
+      <div class="host-pick" id="saveHosts" role="radiogroup" aria-label="Download from"></div>
+    </div>
+    <label>Save to</label>
+    <div class="save-path-row">
+      <div class="save-path" id="savePath"></div>
+      <button type="button" class="btn" id="saveChange">Change</button>
+    </div>
+    <label class="save-default" id="saveDefaultRow" hidden><input type="checkbox" id="saveDefault" /> Use this folder for all future downloads</label>
+    <p class="field-note">By default games are saved inside Zruxr's own folder.</p>
+    <p class="beta-warn" id="saveBeta"><span class="beta-pill">Beta</span> Downloads are in beta: things can break. If one fails, try another host.</p>
+    <p class="field-note save-browser-note" id="saveBrowserNote" hidden>This host's page will open inside the launcher. Press Download there and wait: the download starts by itself. If a popup is blocked, press Download again.</p>
+    <div class="actions">
+      <button type="button" class="btn ghost" id="saveCancel">Cancel</button>
+      <button type="button" class="btn primary" id="saveGo">Download</button>
+    </div>
   </dialog>
 
   <!-- Scan for games -->

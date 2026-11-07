@@ -1,12 +1,18 @@
 {
   "name": "zruxr",
   "productName": "Zruxr",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Zruxr - a simple launcher for your own game files.",
   "author": "Zruxr",
+  "license": "MIT",
+  "homepage": "https://github.com/Zruxr2/Zruxr-Launcher#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/Zruxr2/Zruxr-Launcher.git" },
+  "bugs": { "url": "https://github.com/Zruxr2/Zruxr-Launcher/issues" },
+  "keywords": ["game-launcher", "launcher", "electron", "windows", "library"],
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "test": "node --test",
     "dist": "node scripts/build-installer.js",
     "dist:setup": "electron-builder --win nsis",
     "dist:portable": "electron-builder --win portable",
@@ -31,6 +37,11 @@
       "updater.js",
       "scanner.js",
       "discover.js",
+      "sources.js",
+      "sources-parse.js",
+      "resolvers.js",
+      "postprocess.js",
+      "extract-worker.js",
       "renderer/**/*",
       "build/icon.png"
     ],
@@ -54,11 +65,14 @@
       {
         "provider": "github",
         "owner": "Zruxr2",
-        "repo": "Zruxr-Launcher"
+        "repo": "Zruxr-Launcher",
+        "releaseType": "release"
       }
     ]
   },
   "dependencies": {
-    "electron-updater": "^6.3.9"
+    "electron-updater": "^6.3.9",
+    "extract-zip": "^2.0.1",
+    "node-unrar-js": "^2.0.2"
   }
 }

@@ -1,14 +1,33 @@
-Zruxr animated installer
+# Zruxr animated installer
 
-Preview the animation (no real install):
-  npm install
-  npm run demo
+A small Electron app that plays a startup animation and then runs the real Zruxr installer (`payload/core.exe`).
 
-Build the real thing:
-  1. In the launcher project run: npm run dist:setup
-  2. Copy dist\Zruxr-Setup-1.2.3.exe into this project as payload\core.exe
-  3. Here run: npm run build
-  4. Hand out dist\Zruxr-Installer-1.2.3.exe
+## Preview the animation (no real install)
 
-Keep uploading the normal Zruxr-Setup-x.x.x.exe + latest.yml to GitHub for auto-update.
-Tweak EXPECTED_BYTES in main.js if the progress bar finishes too early/late.
+```bash
+npm install
+npm run demo
+```
+
+## Build it
+
+From the **launcher project root** (not this folder):
+
+```bash
+npm run dist
+```
+
+That script (`scripts/build-installer.js`) does everything:
+
+1. Builds the normal installer, `dist/Zruxr-Setup-<version>.exe`.
+2. Copies it here as `payload/core.exe`.
+3. Syncs this app's version with the launcher's `package.json`.
+4. Builds the wrapper and copies `Zruxr-Installer-<version>.exe` into the launcher's `dist/`.
+
+`payload/core.exe` is ignored by git; it is rebuilt every time.
+
+## Releasing
+
+Hand out `Zruxr-Installer-<version>.exe`. For auto-update to work, also upload the normal `Zruxr-Setup-<version>.exe`, its `.blockmap` and `latest.yml` to the GitHub release.
+
+If the progress bar finishes too early or late, adjust `EXPECTED_BYTES` in `main.js`.
