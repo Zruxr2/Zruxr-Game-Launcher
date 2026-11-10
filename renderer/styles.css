@@ -1700,3 +1700,32 @@ button.pop-avatar:active { transform: scale(.95); }
 .host-opt[aria-checked="true"] .opt-note { color: #7a5a1e; }
 .host-opt:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .host-link .link-note { margin-left: 5px; font-size: 11px; opacity: .75; }
+
+
+/* ---------- "Game won't start?" help ---------- */
+.lib-tip { margin: 22px 0 0; font-size: 13px; color: var(--muted); }
+.lib-tip strong { color: var(--text); font-weight: 600; }
+.launch-help {
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 295;
+  width: min(720px, calc(100vw - 48px)); display: flex; align-items: center; gap: 16px; padding: 14px 16px 14px 18px;
+  background: var(--panel-2); border: 1px solid #e0b266; border-left-width: 4px; border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .7); font-size: 13.5px; line-height: 1.45;
+}
+.launch-help[hidden] { display: none; }
+.launch-help-text { flex: 1 1 auto; min-width: 0; }
+.launch-help-text strong { display: block; margin-bottom: 2px; color: #f0c47a; }
+.launch-help-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+@media (max-width: 700px) { .launch-help { flex-direction: column; align-items: stretch; } .launch-help-actions { justify-content: flex-end; } }
+.exe-help { color: #e0b266; margin-top: 8px; }
+.exe-suggest { margin-top: 10px; }
+.exe-suggest-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.exe-suggest-list { display: flex; flex-direction: column; gap: 4px; max-height: 190px; overflow: auto; padding-right: 2px; }
+.exe-opt {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 8px 12px; text-align: left;
+  background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 8px; color: var(--text); font: inherit; font-size: 13px; cursor: pointer;
+}
+.exe-opt:hover { border-color: #5a5a5a; }
+.exe-opt:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.exe-opt.selected { border-color: #fff; background: #1f1f1f; }
+.exe-opt-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.exe-opt-meta { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }

@@ -105,7 +105,8 @@
             <h2 id="sectionTitle">All games</h2>
             <span class="section-count" id="sectionCount"></span>
           </div>
-          <div id="grid" class="grid"></div>
+ <div id="grid" class="grid"></div>
+          <p class="lib-tip" id="libTip" hidden>Game won't start, or closes right away? Hover it, press <strong>Edit</strong> and choose a different <strong>.exe</strong>.</p>
           <p id="noResults" class="no-results" hidden>No games match your search.</p>
           <div id="emptyFavs" class="empty-inline" hidden>
             <h3>No favorites yet.</h3>
@@ -385,6 +386,19 @@
   </div>
   <div id="toast" class="toast" hidden></div>
 
+  <!-- Shown when a game closes almost at once or crashes: the .exe chosen for it may be the wrong one -->
+  <div id="launchHelp" class="launch-help" role="alert" hidden>
+    <div class="launch-help-text">
+      <strong id="launchHelpTitle"></strong>
+      <span id="launchHelpBody"></span>
+    </div>
+    <div class="launch-help-actions">
+      <button type="button" id="launchHelpChange" class="btn sm primary">Change .exe</button>
+      <button type="button" id="launchHelpFolder" class="btn sm">Show folder</button>
+      <button type="button" id="launchHelpClose" class="link">Dismiss</button>
+    </div>
+  </div>
+
   <!-- Add / Edit dialog -->
   <dialog id="gameDialog">
     <form method="dialog" id="gameForm">
@@ -394,6 +408,11 @@
       <div class="row">
         <input type="text" id="fPath" readonly placeholder="Choose the game's .exe" />
         <button type="button" id="browsePath" class="btn">Browse</button>
+      </div>
+      <p class="field-note exe-help" id="exeHelp" hidden>Game won't start, or closes straight away? The wrong .exe may be selected. Pick another one below, or press Browse.</p>
+      <div class="exe-suggest" id="exeSuggest" hidden>
+        <div class="exe-suggest-title">Other programs in this game's folder</div>
+        <div class="exe-suggest-list" id="exeSuggestList"></div>
       </div>
 
       <label for="fName">Name</label>

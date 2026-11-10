@@ -13,19 +13,8 @@ const path = require('path');
 const fsp = fs.promises;
 
 // ---------- Which .exe files are the actual game? ----------
-const SKIP_EXE_WORDS = [
-  'unins', 'uninstall', 'setup', 'install', 'redist', 'vcredist', 'vc_redist', 'dxsetup', 'dotnet',
-  'crash', 'report', 'helper', 'updater', 'update', 'patch', 'easyanticheat', 'eac_', 'battleye',
-  'beclient', 'webhelper', 'notification', 'prereq', 'oalinst', 'physx', 'handler', 'subprocess',
-];
-
-// Folders that never hold the game itself (installers, redistributables, engine tools).
-const SKIP_DIRS = new Set([
-  '_commonredist', 'commonredist', 'redist', 'redistributable', 'redistributables', '_redist',
-  'directx', 'vcredist', 'dotnet', 'dotnetfx', '__installer', 'installer', 'installers',
-  'support', 'mono', 'monobleedingedge', 'easyanticheat', 'battleye', 'crashpad', 'crashreport',
-  'crashreporter', 'prerequisites', 'prereq', 'engine', 'thirdparty', 'plugins', 'node_modules',
-]);
+// The rules live in exe-pick.js, shared with finished downloads.
+const { SKIP_DIRS, pickBestExe } = require('./exe-pick');
 
 // Folders the whole-PC walk never enters.
 const DEEP_SKIP = new Set([
@@ -106,29 +95,6 @@ async function listExecutables(root, maxDepth = 3) {
     }
   }
   return out;
-}
-
-// Picks the most likely game .exe: big, shallow, and named like the folder.
-function pickBestExe(folderName, exes, normalize) {
-  const target = normalize(folderName).replace(/ /g, '');
-  let best = null;
-  for (const f of exes) {
-    const base = lower(f.name).replace(/\.exe$/, '');
-    if (SKIP_EXE_WORDS.some((w) => base.includes(w))) continue;
-    if (f.size < 150 * 1024) continue; // tiny programs are helpers, not games
-    const trimmed = base.replace(/-win(64|32)-shipping$/, '').replace(/[-_ ]?(x64|x86|64|32)$/, '');
-    const nb = normalize(trimmed).replace(/ /g, '');
-    let score = Math.log10(f.size + 1) * 10 - f.depth * 4;
-    if (nb && target) {
-      if (nb === target) score += 40;
-      else if (nb.length >= 3 && (target.includes(nb) || nb.includes(target))) score += 22;
-    }
-    // Unreal games keep the real program as "<Game>-Win64-Shipping.exe"; the .exe in the
-    // root is a stub that exits straight away, which would stop the play timer early.
-    if (/-win(64|32)-shipping$/.test(base)) score += 18;
-    if (!best || score > best.score) best = { ...f, score };
-  }
-  return best;
 }
 
 // Steam's manifest files give the game's real name and install folder.

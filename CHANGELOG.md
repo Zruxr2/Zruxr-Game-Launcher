@@ -6,6 +6,21 @@ For versions before 1.2.4, see the [Releases](../../releases) page.
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-11-10
+
+A fix for downloads adding the wrong program to your library, and help for games that won't start.
+
+### Added
+
+- **"Game won't start?" help.** If a game closes within 20 seconds (and you didn't press Stop), or can't start, the library shows a notice: "If it did not open or keeps crashing, the wrong .exe may be selected" with **Change .exe** and **Show folder** buttons. A tip under the library also says so.
+- **Change .exe with one click.** **Edit** on a game now lists the other programs found in its folder, best first (with size and location), so you can switch without browsing. Browse still works.
+
+### Fixed
+
+- **Editing a game after restarting Zruxr did nothing** (renaming or changing the cover was silently ignored until you picked its file again). The game's current file is now accepted.
+
+- **Wrong .exe chosen after a download.** Finished downloads used a simple "biggest program wins" rule, so a big tool, config program, updater or launcher could be picked instead of the game. Downloads now use the same smarter picker as Scan PC (new `exe-pick.js`): it skips helper programs and extras folders (Tools, Server, Editor, Bonus, Crack and similar), prefers a name that matches the game, prefers Unreal's `-Win64-Shipping.exe` over its stub, and only uses a "Launcher" when nothing better exists.
+
 ## [1.2.4] - 2026-11-07
 
 Downloads now finish the job: they land in the launcher's own folder, archives are unpacked for you, and the game shows up in your library without a manual scan. More file hosts are supported, and update notices are clearer.
@@ -61,5 +76,6 @@ Downloads now finish the job: they land in the launcher's own folder, archives a
 - Only `.rar` and `.zip` are unpacked. `.7z`, `.iso` and multi-part RARs are downloaded but left for you to extract.
 - A page download can't resume after a restart; Retry reopens the page.
 
-[Unreleased]: ../../compare/v1.2.4...HEAD
+[Unreleased]: ../../compare/v1.2.5...HEAD
+[1.2.5]: ../../compare/v1.2.4...v1.2.5
 [1.2.4]: ../../compare/v1.2.3...v1.2.4

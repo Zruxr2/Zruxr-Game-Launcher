@@ -16,48 +16,38 @@ function safeEntryName(name) {
     .join('/');
 }
 
-// Programs that live next to a game but are not the game.
-const NOT_THE_GAME = /^(unins\d*|uninstall.*|setup.*|install(er)?.*|dxsetup|dxwebsetup|directx.*|vc_?redist.*|vcredist.*|dotnet.*|ndp\d.*|oalinst|physx.*|crashpad.*|crashreport.*|crashhandler.*|unitycrashhandler.*|ue\d?prereq.*|notification_helper|updater|7z.*|redist.*|windowsdesktop-runtime.*)\.exe$/i;
-const INSTALLER = /^(setup.*|install(er)?.*|unins\d*)\.exe$/i;
-const SKIP_DIRS = /^(_commonredist|commonredist|redist|redistributables?|directx|vcredist|dotnet|__macosx|\.git|support)$/i;
+const { SKIP_DIRS, INSTALLER, pickBestExe } = require('./exe-pick');
 
-const words = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').split(' ').filter((w) => w.length > 2);
-
-// Looks through an extracted folder for the game's .exe.
+// Looks through an extracted folder for the game's .exe, with the same rules Scan PC uses (exe-pick.js).
 // Returns { exe, installerOnly }. exe is null when nothing suitable was found;
 // installerOnly is true when the only programs found were installers.
 function findGameExe(root, title, { maxDepth = 5 } = {}) {
   const found = [];
   let sawInstaller = false;
+  let visited = 0;
   const queue = [{ dir: root, depth: 0 }];
-  while (queue.length) {
+  while (queue.length && visited < 20000) {
     const { dir, depth } = queue.shift();
     let entries = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    visited += entries.length;
     for (const e of entries) {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
-        if (depth < maxDepth && !SKIP_DIRS.test(e.name)) queue.push({ dir: full, depth: depth + 1 });
+        if (depth < maxDepth && !SKIP_DIRS.has(e.name.toLowerCase())) queue.push({ dir: full, depth: depth + 1 });
       } else if (/\.exe$/i.test(e.name)) {
         if (INSTALLER.test(e.name)) sawInstaller = true;
-        if (NOT_THE_GAME.test(e.name)) continue;
         let size = 0;
         try { size = fs.statSync(full).size; } catch {}
         found.push({ full, name: e.name, size, depth });
       }
     }
   }
-  if (!found.length) return { exe: null, installerOnly: sawInstaller };
-
-  // Biggest program wins (the real game binary is almost always the largest .exe), and a
-  // name that matches the game's title counts for more.
-  const tw = new Set(words(title));
-  const score = (f) => {
-    const hit = words(path.basename(f.name, '.exe')).some((w) => tw.has(w));
-    return f.size * (hit ? 4 : 1) - f.depth;
-  };
-  found.sort((a, b) => score(b) - score(a));
-  return { exe: found[0].full, installerOnly: false };
+  if (!found.length) return { exe: null, installerOnly: false };
+  // Compare against the game's folder name too: it is the cleaned title the download was unpacked into.
+  const best = pickBestExe(`${path.basename(root)} ${title || ''}`.trim(), found, undefined, { relaxed: true });
+  if (best) return { exe: best.full, installerOnly: false };
+  return { exe: null, installerOnly: sawInstaller };
 }
 
 // Moves freshly extracted files from the temporary folder to their final place.

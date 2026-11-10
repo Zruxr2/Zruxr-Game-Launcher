@@ -326,6 +326,7 @@ function renderGames(opts = {}) {
   sectionTitle.textContent = isFav ? 'Starred games' : 'All games';
   sectionCount.textContent = base.length ? (q ? `${visible.length} of ${base.length}` : String(base.length)) : '';
   noResults.hidden = !(base.length > 0 && visible.length === 0);
+  document.getElementById('libTip').hidden = base.length === 0;
 
   const intro = animateCards || opts.intro;
   const firstDelay = animateCards ? 5 : 0.5;
@@ -567,7 +568,31 @@ function render(opts = {}) {
   else renderGames(opts);
 }
 
+// A game closed within seconds, or crashed: the .exe chosen for it may be the wrong one.
+const launchHelp = document.getElementById('launchHelp');
+let launchHelpId = null;
+function showLaunchTrouble(t) {
+  const g = games.find((x) => x.id === t.id);
+  if (!g) return;
+  launchHelpId = t.id;
+  document.getElementById('launchHelpTitle').textContent =
+    t.kind === 'error' ? `"${t.name}" could not start.` :
+    t.kind === 'crash' ? `"${t.name}" stopped after ${t.seconds} s (it may have crashed).` :
+    `"${t.name}" closed after ${t.seconds} s.`;
+  document.getElementById('launchHelpBody').textContent =
+    ' If it did not open or keeps crashing, the wrong .exe may be selected. Press Change .exe and pick another one. (Some games open through a launcher that closes by itself: then this is fine.)';
+  launchHelp.hidden = false;
+}
+document.getElementById('launchHelpChange').addEventListener('click', () => {
+  const g = games.find((x) => x.id === launchHelpId);
+  launchHelp.hidden = true;
+  if (g) openDialog('edit', g);
+});
+document.getElementById('launchHelpFolder').addEventListener('click', () => { if (launchHelpId) window.launcher.showInFolder(launchHelpId); });
+document.getElementById('launchHelpClose').addEventListener('click', () => { launchHelp.hidden = true; });
+
 function handleLaunchResult(res) {
+  if (res && res.ok) launchHelp.hidden = true;
   if (res && !res.ok) showToast(res.error || 'Could not launch the game.');
 }
 
@@ -832,6 +857,7 @@ async function openDialog(mode, game) {
     resetCover: false,
   };
   dialogTitle.textContent = mode === 'add' ? 'Add game' : game.path ? 'Edit game' : 'Locate game';
+  loadExeSuggestions(mode === 'edit' && game?.path ? game.id : null);
   coverSection.hidden = mode === 'add';
   fPath.value = form.path;
   fName.value = form.name;
@@ -853,11 +879,50 @@ async function openDialog(mode, game) {
 
 fName.addEventListener('input', () => { if (form && !form.coverSrc && !(form.existingCover && !form.resetCover)) updateCoverPreview(); });
 
+// "Change .exe": the other programs found in the game's folder, best first. Click one to use it.
+const exeHelp = document.getElementById('exeHelp');
+const exeSuggest = document.getElementById('exeSuggest');
+const exeSuggestList = document.getElementById('exeSuggestList');
+async function loadExeSuggestions(id) {
+  exeHelp.hidden = !id;
+  exeSuggest.hidden = true;
+  exeSuggestList.textContent = '';
+  if (!id) return;
+  let list = [];
+  try { list = await window.launcher.suggestExes(id); } catch {}
+  if (!form || form.id !== id || list.length < 2) return; // nothing else to choose from
+  for (const f of list) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'exe-opt';
+    b.dataset.path = f.path;
+    const name = document.createElement('span');
+    name.className = 'exe-opt-name';
+    name.textContent = f.name;
+    const meta = document.createElement('span');
+    meta.className = 'exe-opt-meta';
+    meta.textContent = `${f.rel.includes('\\') || f.rel.includes('/') ? f.rel : 'main folder'} · ${f.sizeMB} MB`;
+    b.append(name, meta);
+    b.addEventListener('click', () => {
+      form.path = f.path;
+      fPath.value = f.path;
+      markExeChoice();
+    });
+    exeSuggestList.append(b);
+  }
+  exeSuggest.hidden = false;
+  markExeChoice();
+}
+function markExeChoice() {
+  for (const b of exeSuggestList.children) b.classList.toggle('selected', b.dataset.path === form.path);
+}
+
 document.getElementById('browsePath').addEventListener('click', async () => {
   const picked = await window.launcher.pickGameFile();
   if (!picked) return;
   form.path = picked.path;
   fPath.value = picked.path;
+  markExeChoice();
   if (!fName.value.trim()) fName.value = picked.name;
 });
 
@@ -1178,6 +1243,7 @@ async function boot() {
     render();
   });
   window.launcher.onLaunchError(showToast);
+  window.launcher.onLaunchTrouble(showLaunchTrouble);
   window.launcher.getUpdate().then(showUpdate).catch(() => {});
   window.launcher.onUpdate(showUpdate);
   window.launcher.onAccountChanged((state) => {

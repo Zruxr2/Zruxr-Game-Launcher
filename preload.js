@@ -64,5 +64,7 @@ contextBridge.exposeInMainWorld('launcher', {
   onHostStatus: (cb) => ipcRenderer.on('hostview:status', (_e, p) => cb(p)),
   onHostClose: (cb) => ipcRenderer.on('hostview:close', (_e, p) => cb(p)),
   onDownloads: (cb) => ipcRenderer.on('downloads:changed', (_e, list) => cb(list)),
+  suggestExes: (id) => ipcRenderer.invoke('game:suggestExes', id),
+  onLaunchTrouble: (cb) => ipcRenderer.on('launch:trouble', (_e, t) => cb(t)),
   onLaunchError: (cb) => ipcRenderer.on('launch:error', (_e, msg) => cb(msg)),
 });

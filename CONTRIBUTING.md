@@ -30,7 +30,8 @@ If Electron says it "failed to install correctly", see the note in the [README](
 | `scanner.js` | Finds installed games (Steam, Epic, GOG, folders) |
 | `sources.js`, `sources-parse.js` | Sources, the download manager, host pages, unpacking hand-off |
 | `resolvers.js` | Which links can be downloaded, host names/order, `HOST_ISSUES` |
-| `postprocess.js`, `extract-worker.js` | Unpacking archives and finding the game's `.exe` |
+| `postprocess.js`, `extract-worker.js` | Unpacking archives, tidying folders, handing the result to the library |
+| `exe-pick.js` | Which `.exe` is the game (shared by Scan PC and finished downloads) |
 | `cloud.js`, `updater.js` | Optional accounts, auto-update |
 | `installer-ui/` | The animated installer (a separate Electron app) |
 
@@ -47,7 +48,7 @@ These keep Zruxr safe, so please keep them true in your changes:
 ## Pull requests
 
 1. Fork, create a branch, make your change.
-2. Add or update tests in `test/` when you change `resolvers.js` or `postprocess.js` (they run with `npm test`).
+2. Add or update tests in `test/` when you change `resolvers.js`, `postprocess.js` or `exe-pick.js` (they run with `npm test`).
 3. Run `npm test` and try the change in the app.
 4. Add a line under **Unreleased** in [CHANGELOG.md](CHANGELOG.md).
 5. Open the PR and fill in the template.

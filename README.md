@@ -29,27 +29,33 @@ Most launchers want you to buy things. Zruxr doesn't sell anything. It's for the
 
 ## Features
 
-**Find your games for you.** Press **Scan PC** and Zruxr finds games already installed: Steam libraries (read from Steam's own files), Epic, GOG and your Games folders. Tick the ones you want and add them in one go. "Whole PC" mode searches every drive, and you can also scan a single folder. It only reads folder and file names, nothing is changed or uploaded.
+### Your library
 
-**Discover, kept small.** A slim row on the home page shows what's popular on Steam right now: top sellers, top free, new releases and what's on sale. Click a game to open its store page. Hide it with one click, or turn it off in Settings.
+- **Scan PC finds your games.** Steam libraries (read from Steam's own files), Epic, GOG and your Games folders. Tick the ones you want and add them in one go. "Whole PC" mode searches every drive, and you can scan a single folder. It only reads folder and file names; nothing is changed or uploaded.
+- **Add any game by hand.** Choose its `.exe` (or `.bat` / `.cmd`).
+- **Cover art, automatically.** Zruxr looks the game up by name (and by its folder name) and downloads the portrait art. You never upload an image. If a game can't be found, it gets a clean generated cover, and Zruxr checks again once a week. You can also **use your own image**.
+- **Play time that tracks itself.** Launch from Zruxr and the clock runs until the game closes. Totals are saved as you play, and a "Jump back in" banner puts your last game one click away.
+- **A library that feels good.** Hover a cover for Play, star your favorites, sort by name, last played, most played or recently added, and press `/` to search. Each cover's main colour becomes the soft glow behind it. Small, medium or large covers.
+- **Help when a game won't start.** If a game closes within about 20 seconds, or can't start, Zruxr says so and offers **Change .exe**. **Edit** also lists the other programs in the game's folder, best first, so you can switch with one click.
+- **Stats you'll actually look at.** Total hours, this week's hours, a 7-day chart and your most played games.
+- **Discover, kept small.** A slim row on the home page shows what's popular on Steam: top sellers, top free, new releases and what's on sale. Click a game to open its store page. Hide it with one click, or turn it off in Settings.
 
-**Cover art, automatically.** Add a game and Zruxr looks it up by name (and by its folder name) and downloads the portrait art. You never upload an image. If a game can't be found, it gets a clean generated cover instead, and Zruxr checks again once a week.
+### Downloads (beta)
 
-**Play time that tracks itself.** Launch from Zruxr and the clock runs until the game closes. Totals are saved as you play, and a "Jump back in" banner always puts your last game one click away.
+- **Sources.** Press **Add source** and paste a web address: a JSON list (including Hydra-style lists), a web page or open folder that links to files, or a direct file link. A **Downloads** tab shows a cover and a big Download button for every game. Press refresh on a source to re-read it.
+- **Search and sort.** Search the list and sort it by source order, name (A to Z or Z to A), size (largest or smallest) or date (newest or oldest). Your choice is remembered.
+- **Pick the host and the folder.** Pixeldrain downloads by itself. Gofile, FileKeeper, BuzzHeavier, FuckingFast and MediaFire open in a panel inside the launcher that tells you what to press ("Press Download and wait"; on FileKeeper, the button under the main Download button) and shows a big orange warning when a popup was blocked. Hosts that make you solve captchas are not used. Choose where each game is saved (inside Zruxr's own folder by default).
+- **It finishes the job.** Zruxr unpacks `.rar` and `.zip` files in the background, tidies the folder, finds the game's `.exe` and adds it to your library. Up to three downloads run at once, with pause, resume and cancel.
+- **Fallbacks.** If a host won't work in the panel: switch host, **Open in browser**, or **I downloaded it** to hand over a file you saved yourself.
 
-**A library that feels good.** Hover a cover for Play, star your favorites, sort by name, last played, most played or recently added, and press `/` to search. Each cover's main colour becomes the soft glow behind it.
+See [Downloads in detail](#downloads-in-detail).
 
-**Sources and downloads.** Press **Add source** on the home page and paste a web address: a JSON list (including Hydra-style lists), a web page or open folder that links to files, or a direct file link. A **Downloads** tab appears with a cover and a big Download button for every game. Pick where to save each one (inside Zruxr's own folder by default), and Zruxr unpacks `.rar` and `.zip` files for you and adds the game to your library. See [Downloads in detail](#downloads-in-detail).
+### The app
 
-**More than one file host.** Pixeldrain links download by themselves. Other hosts (Gofile, FileKeeper, BuzzHeavier, FuckingFast, MediaFire) open in a panel inside the launcher with a line saying what to press, then the download carries on in the launcher. You choose the host in the Download dialog. Hosts that make you solve captchas are not used. Downloads from file hosts are in **beta**.
-
-**Stats you'll actually look at.** Total hours, this week's hours, a 7-day chart and your most played games.
-
-**Updates itself.** The installed version checks GitHub Releases, downloads new versions in the background and installs them when you close Zruxr.
-
-**Accounts are optional.** Zruxr works fully without one. If you do create a free account, your game list and play time follow you between PCs.
-
-**Yours to tweak.** Small, medium or large covers, start with Windows, and a startup animation you can turn off.
+- **Updates itself.** The installed version checks GitHub Releases, downloads new versions in the background and shows "New version available" with progress, then **Restart now** (or installs when you close Zruxr). **Settings > Updates** has a **Check now** button and shows the reason if a check fails.
+- **Accounts are optional.** Zruxr works fully without one. With a free account, your game list and play time follow you between PCs.
+- **Yours to tweak.** Cover size, start with Windows, a startup animation you can turn off, and switches for the Discover row and the Downloads tab.
+- **Safe by design.** The window can only run files you picked in the launcher's own dialogs, host pages run sandboxed and can only reach public web pages, and archives can't write outside their own folder.
 
 ## Screenshots
 
@@ -80,7 +86,8 @@ Grab the latest build from the [**Releases**](../../releases/latest) page:
 
 | File | What it is |
 | --- | --- |
-| `Zruxr-Portable-x.y.z.exe` | One file. Double-click to run, no install. |
+| `Zruxr-Installer-x.y.z.exe` | Animated installer (runs the setup below for you). Updates itself. |
+| `Zruxr-Portable-x.y.z.exe` | One file. Double-click to run, no install. Doesn't update itself. |
 | `Zruxr-Setup-x.y.z.exe` | Installer with Start menu and desktop shortcuts, plus an uninstaller. Updates itself. |
 
 Windows SmartScreen may warn about an unknown publisher because the app isn't code-signed. Choose **More info**, then **Run anyway**.
@@ -93,7 +100,9 @@ Windows SmartScreen may warn about an unknown publisher because the app isn't co
 
 If a cover is wrong or missing, hover the game, click **Edit**, fix the name, or pick your own image. **Find automatically** switches back.
 
-**Shortcuts:** `1` to `5` switch tabs, `/` searches, `Esc` clears the search.
+**Game won't start, or closes straight away?** The wrong `.exe` may be selected. Zruxr notices when a game closes within about 20 seconds and offers **Change .exe**. You can also hover the game, press **Edit**, and click another program from the list of what's in its folder (or **Browse**).
+
+**Shortcuts:** `1` to `5` switch tabs, `/` searches, `Esc` clears the search (and closes a host panel).
 
 Your library is saved in `%APPDATA%\Zruxr\library.json`, with covers in a `covers` folder beside it and your preferences in `settings.json`.
 
@@ -116,7 +125,7 @@ Downloads run in the background (up to three at once), with pause, resume and an
 
 1. `.rar` and `.zip` files are unpacked in the background (the launcher stays responsive), with progress shown on the button.
 2. If the archive holds one top-level folder, that folder becomes the game folder (no `Game/Game/game.exe`).
-3. The game's `.exe` is picked (the largest real program, ignoring uninstallers, crash handlers and redistributables) and added to your library, named from the download title so cover art is found.
+3. The game's `.exe` is picked with the same rules Scan PC uses (`exe-pick.js`): helper programs, installers, crash handlers and extras folders are skipped, a name that matches the game wins, Unreal's `-Win64-Shipping.exe` beats its small stub, and a "Launcher" is only used when nothing better exists. It is added to your library, named from the download title so cover art is found. If it picked wrong, use **Change .exe** (see [Using it](#using-it)).
 4. The archive is deleted once it has unpacked cleanly. If unpacking fails (password, damaged file, no disk space) the archive is kept and **Retry** unpacks it again without downloading.
 5. If an archive only contains an installer (`setup.exe`), nothing is added: open the folder, run it, then use **Scan PC**.
 
@@ -133,7 +142,7 @@ Pixeldrain links are fetched by the launcher itself. For any other `https` link,
 
 Safety rules for the panel: it is sandboxed with its own cookies, pop-ups to other sites are blocked (a pop-up from the same site is followed), it can only visit public web pages (never your PC or home network), and an unexpected program download from an ad (`.msi`, `.scr`, `.apk`, and so on) is refused. A `.exe` that comes from a web page is never added to your library automatically.
 
-Sources are re-read once automatically after updating to 1.2.4, so the current host rules apply. Press refresh on a source any time to re-read it.
+Sources are re-read once automatically after an update that changes the host rules (as in 1.2.4), so the current rules apply. Press refresh on a source any time to re-read it.
 
 ### Marking a host as having problems
 
@@ -196,7 +205,7 @@ If you fork this and want your own backend, create a Supabase project, then repl
 ## Known limitations
 
 - Favorites and the per-day history behind the Stats chart live on your PC only. They don't sync to your account yet. Total play time does.
-- Play time is measured from the process Zruxr starts. A game that opens through its own launcher and then closes it will stop the timer early.
+- Play time is measured from the process Zruxr starts. A game that opens through its own launcher and then closes it will stop the timer early. Zruxr will show the "Change .exe" notice in that case; if the launcher is the right file, just dismiss it.
 - `.lnk` shortcuts aren't supported yet. Pick the real `.exe` instead.
 - Automatic covers only match games that exist on Steam, and only on a close name match. That's deliberate, so unofficial games don't end up with the wrong art.
 - "Start with Windows" only works in the installed or portable app, not under `npm start`.
@@ -206,6 +215,7 @@ If you fork this and want your own backend, create a Supabase project, then repl
 - The Friends tab is a placeholder for now.
 - Pages from file hosts are shown inside the launcher, but some hosts may refuse to continue in an embedded page (downloads are in beta). Use another host, **Open in browser**, or **I downloaded it**.
 - Only `.rar` and `.zip` are unpacked. `.7z`, `.iso` and multi-part RARs are left for you to extract.
+- Downloads are in beta: some hosts or games may fail, and the list only shows games with a link on a supported host.
 - Windows only for now.
 
 ## Roadmap
@@ -218,6 +228,8 @@ If you fork this and want your own backend, create a Supabase project, then repl
 - [x] Auto-update from GitHub Releases (installed version only)
 - [x] Download to a chosen folder, unpack archives and add games automatically
 - [x] Hosts that need a click, shown inside the launcher
+- [x] Sorting and searching on the Downloads page
+- [x] "Change .exe" help for games that won't start
 - [ ] Collections and tags
 - [ ] Controller-friendly "big screen" mode
 
@@ -230,8 +242,8 @@ To publish an update, either let GitHub do it or do it by hand.
 **Automatic (recommended).** Bump `version` in `package.json`, add the version to [CHANGELOG.md](CHANGELOG.md), commit, then push a tag that matches it:
 
 ```bash
-git tag v1.2.4
-git push origin v1.2.4
+git tag v1.2.5
+git push origin v1.2.5
 ```
 
 The **Release** workflow (`.github/workflows/release.yml`) runs the tests, checks the tag matches `package.json`, builds the installer and portable `.exe` on Windows, and publishes them with `latest.yml` and the `.blockmap` to a normal (non-draft) GitHub release. The release text is taken from `docs/release-notes/vX.Y.Z.md` if that file exists. The animated `Zruxr-Installer` is built locally with `npm run dist` and can be added to the release by hand.
@@ -240,7 +252,7 @@ The **Release** workflow (`.github/workflows/release.yml`) runs the tests, check
 
 **If people on the old version don't see the update**, check these in order:
 
-1. **The version number.** `latest.yml` is generated from `version` in `package.json`. If it is the same as (or lower than) what people already have, nobody is offered an update. Open `latest.yml`: its `version:` line must be higher than the old version. (This release is 1.2.4, so it is offered to people on 1.2.3 and older.)
+1. **The version number.** `latest.yml` is generated from `version` in `package.json`. If it is the same as (or lower than) what people already have, nobody is offered an update. Open `latest.yml`: its `version:` line must be higher than the old version. (Release 1.2.5 is offered to everyone on 1.2.4 and older.)
 2. **Use the `latest.yml` that was built with the installer.** Don't write it by hand or copy it from another build: it contains the installer's file name, size and `sha512`, and a mismatch makes the download fail.
 3. **All three files on the release:** `Zruxr-Setup-X.Y.Z.exe`, its `.blockmap` and `latest.yml`. The file name inside `latest.yml` must match the uploaded asset exactly. The animated `Zruxr-Installer-X.Y.Z.exe` on its own is not enough.
 4. **The release must be published**, not a draft or a pre-release, and the repository must be public. The tag must be `vX.Y.Z`.

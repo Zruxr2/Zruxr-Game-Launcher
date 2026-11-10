@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { pathToFileURL } = require('url');
 const cloud = require('./cloud');
 const scanner = require('./scanner');
+const { rankExes } = require('./exe-pick');
 const updater = require('./updater');
 const { createDiscover } = require('./discover');
 const sources = require('./sources');
@@ -17,6 +18,7 @@ const sources = require('./sources');
 const pickedPaths = new Set();
 const isPicked = (p) => typeof p === 'string' && pickedPaths.has(p);
 const LAUNCHABLE_EXTS = new Set(['.exe', '.bat', '.cmd']);
+const QUICK_EXIT_SECONDS = 20; // a game that ends sooner than this probably didn't really start
 const COVER_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
 const MAX_COVER_BYTES = 8 * 1024 * 1024;
 
@@ -166,13 +168,23 @@ function launchGame(id) {
     } else {
       child = spawn(game.path, [], opts);
     }
-    running.set(id, { child, startedAt, counted: 0 });
+    const entry = { child, startedAt, counted: 0, stopped: false };
+    running.set(id, entry);
     child.on('error', (err) => {
       running.delete(id);
       send('launch:error', `Could not start "${game.name}": ${err.message}`);
+      send('launch:trouble', { id, name: game.name, kind: 'error', detail: err.message });
       pushLibrary();
     });
-    child.on('exit', () => recordSession(id));
+    child.on('exit', (code) => {
+      const seconds = Math.round((Date.now() - startedAt) / 1000);
+      recordSession(id);
+      // Closed almost at once and not by the person pressing Stop: it crashed, or this .exe is only a
+      // stub/launcher. Tell the library so it can offer "Change .exe".
+      if (!entry.stopped && seconds < QUICK_EXIT_SECONDS) {
+        send('launch:trouble', { id, name: game.name, kind: code ? 'crash' : 'quick', seconds, code: code ?? null });
+      }
+    });
     pushLibrary();
     return { ok: true };
   } catch (err) {
@@ -486,6 +498,30 @@ ipcMain.handle('dialog:pickGameFile', async () => {
   return { path: filePath, name: guessedName };
 });
 
+// Other programs in the game's folder, best first, for "Change .exe". The paths come from this process
+// (not from the UI), so they are safe to accept in game:update.
+const UP_FROM = new Set(['bin', 'bin32', 'bin64', 'binaries', 'win64', 'win32', 'x64', 'x86', 'windows', 'release', 'releases', 'build', 'game']);
+ipcMain.handle('game:suggestExes', async (_e, id) => {
+  const game = loadLibrary().find((g) => g.id === id);
+  if (!game || !game.path) return [];
+  try {
+    let root = path.dirname(game.path);
+    for (let i = 0; i < 4; i++) {
+      const parent = path.dirname(root);
+      if (parent === root || !UP_FROM.has(path.basename(root).toLowerCase())) break;
+      root = parent;
+    }
+    const exes = await scanner.listExecutables(root, 4);
+    const ranked = rankExes(path.basename(root) + ' ' + game.name, exes, normalize).slice(0, 12);
+    return ranked.map((f) => {
+      pickedPaths.add(f.full);
+      return { path: f.full, name: f.name, rel: path.relative(root, f.full), sizeMB: Math.round((f.size / 1048576) * 10) / 10, current: f.full === game.path };
+    });
+  } catch {
+    return [];
+  }
+});
+
 ipcMain.handle('dialog:pickCover', async () => {
   const res = await dialog.showOpenDialog(win, {
     title: 'Select cover art',
@@ -612,8 +648,11 @@ ipcMain.handle('discover:open', (_e, id) => {
 });
 
 ipcMain.handle('game:update', async (_e, { id, name, path: gamePath, coverSrc, resetCover } = {}) => {
-  // Reject any file path that didn't come from our own file dialogs.
-  if ((gamePath && !isPicked(gamePath)) || (coverSrc && !isPicked(coverSrc))) {
+  // Reject any file path that didn't come from our own file dialogs. The game's own current path is
+  // fine (editing only the name or cover sends it back unchanged, also after a restart).
+  const current = loadLibrary().find((g) => g.id === id);
+  const sameAsNow = !!(current && gamePath && gamePath === current.path);
+  if ((gamePath && !sameAsNow && !isPicked(gamePath)) || (coverSrc && !isPicked(coverSrc))) {
     return withStatus(loadLibrary());
   }
   const newIcon = gamePath ? await getExeIcon(gamePath) : null; // await first, then load+save with no gap
@@ -674,7 +713,7 @@ ipcMain.handle('game:launch', (_e, id) => launchGame(id));
 
 ipcMain.handle('game:stop', (_e, id) => {
   const entry = running.get(id);
-  if (entry) killTree(entry.child);
+  if (entry) { entry.stopped = true; killTree(entry.child); }
   return true;
 });
 
