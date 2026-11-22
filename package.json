@@ -1,7 +1,7 @@
 {
   "name": "zruxr",
   "productName": "Zruxr",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "Zruxr - a simple launcher for your own game files.",
   "author": "Zruxr",
   "license": "MIT",
@@ -38,6 +38,7 @@
       "scanner.js",
       "discover.js",
       "sources.js",
+      "install-utils.js",
       "sources-parse.js",
       "resolvers.js",
       "exe-pick.js",

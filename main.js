@@ -10,6 +10,7 @@ const { rankExes } = require('./exe-pick');
 const updater = require('./updater');
 const { createDiscover } = require('./discover');
 const sources = require('./sources');
+const { uninstallTarget, legacyUninstallTarget, writeFileAtomic, makeThrottle } = require('./install-utils');
 
 // ---------- Security: only trust paths the user picked in our own dialogs ----------
 // The renderer could be tricked (e.g. by an XSS bug) into asking us to run or copy
@@ -37,12 +38,31 @@ function loadLibrary() {
 
 function saveLibrary(games) {
   fs.mkdirSync(dataDir(), { recursive: true });
-  fs.writeFileSync(libraryFile(), JSON.stringify(games, null, 2));
+  writeFileAtomic(libraryFile(), JSON.stringify(games, null, 2));
 }
 
 // ---------- Settings ----------
+// Title-bar colours per theme (the window controls sit on top of this bar).
+const THEME_BARS = {
+  dark: ['#090909', '#8c8c8c'],
+  midnight: ['#070b14', '#8191b0'],
+  violet: ['#0b0713', '#9a8cb5'],
+  crimson: ['#0d0707', '#b09090'],
+  forest: ['#070d09', '#86a091'],
+  light: ['#f5f5f7', '#62626e'],
+};
+function applyThemeBar(name) {
+  const bar = THEME_BARS[name] || THEME_BARS.dark;
+  try {
+    if (win && !win.isDestroyed()) {
+      win.setBackgroundColor(bar[0]);
+      win.setTitleBarOverlay({ color: bar[0], symbolColor: bar[1], height: 48 });
+    }
+  } catch { /* not supported on this system: the bar just keeps its colour */ }
+}
+
 const settingsFile = () => path.join(dataDir(), 'settings.json');
-const DEFAULT_SETTINGS = { cardSize: 'medium', startupAnimation: true, startWithWindows: false, sort: 'name', showDiscover: true, showDownloads: true, promoDismissed: false, downloadDir: '' };
+const DEFAULT_SETTINGS = { cardSize: 'medium', startupAnimation: true, startWithWindows: false, sort: 'name', showDiscover: true, showDownloads: true, promoDismissed: false, downloadDir: '', theme: 'dark' };
 
 function loadSettings() {
   try {
@@ -73,6 +93,8 @@ function dayKey(date = new Date()) {
 
 const running = new Map(); // id -> { child, startedAt }
 const findingCover = new Set(); // ids currently being looked up
+let sourcesApi = null;
+const uninstalling = new Set(); // ids whose files are being deleted right now
 
 function withStatus(games) {
   return games.map((g) => ({
@@ -81,6 +103,8 @@ function withStatus(games) {
     cover: g.cover && fs.existsSync(path.join(coversDir(), g.cover)) ? g.cover : null,
     running: running.has(g.id),
     findingCover: findingCover.has(g.id),
+    uninstalling: uninstalling.has(g.id),
+    canUninstall: !!g.path,
   }));
 }
 
@@ -429,7 +453,7 @@ function loadProfile() {
 
 function saveProfile(profile) {
   fs.mkdirSync(dataDir(), { recursive: true });
-  fs.writeFileSync(profileFile(), JSON.stringify(profile, null, 2));
+  writeFileAtomic(profileFile(), JSON.stringify(profile, null, 2));
 }
 
 // "u:" prefix keeps odd usernames (like __proto__) from colliding with object internals.
@@ -533,12 +557,47 @@ ipcMain.handle('dialog:pickCover', async () => {
   return res.filePaths[0];
 });
 
-async function addGameEntry(gamePath, name) {
+function cleanMeta(meta) {
+  const out = {};
+  if (!meta || typeof meta !== 'object') return out;
+  const i = meta.install;
+  if (i && typeof i === 'object') {
+    out.install = {};
+    for (const k of ['dir', 'file', 'root']) if (typeof i[k] === 'string' && path.isAbsolute(i[k])) out.install[k] = i[k];
+  }
+  const d = meta.dl;
+  if (d && typeof d === 'object' && typeof d.url === 'string') {
+    out.dl = {
+      title: String(d.title || '').slice(0, 200),
+      url: d.url.slice(0, 4096),
+      alts: (Array.isArray(d.alts) ? d.alts : []).filter((u) => typeof u === 'string').slice(0, 5),
+      sha256: /^[a-f0-9]{64}$/i.test(d.sha256 || '') ? d.sha256.toLowerCase() : '',
+      sourceName: String(d.sourceName || '').slice(0, 100),
+      dir: typeof d.dir === 'string' ? d.dir : '',
+    };
+  }
+  return out;
+}
+
+async function addGameEntry(gamePath, name, meta) {
   const icon = await getExeIcon(gamePath); // await first, then load+save with no gap
   const games = loadLibrary();
+  const extra = cleanMeta(meta);
+  // Re-installing an uninstalled game: put the files back on the SAME library entry (keeps play time, cover, favourite).
+  const wantId = meta && typeof meta.reinstallOf === 'string' ? meta.reinstallOf : '';
+  const old = games.find((g) => g.uninstalled && ((wantId && g.id === wantId) || (!wantId && normalize(g.name) === normalize(name || ''))));
+  if (old) {
+    old.path = gamePath;
+    old.icon = icon || old.icon;
+    delete old.uninstalled;
+    Object.assign(old, extra);
+    saveLibrary(games);
+    return old.id;
+  }
   const id = crypto.randomUUID();
   const cleanName = (typeof name === 'string' ? name : '').trim().slice(0, 200);
   games.push({
+    ...extra,
     id,
     name: cleanName || path.basename(gamePath, path.extname(gamePath)),
     path: gamePath,
@@ -672,6 +731,8 @@ ipcMain.handle('game:update', async (_e, { id, name, path: gamePath, coverSrc, r
   if (gamePath && gamePath !== game.path) {
     game.path = gamePath;
     game.icon = newIcon;
+    delete game.uninstalled; // pointing at a file again means it's installed
+    delete game.install; // we no longer know this is a Zruxr-made install, so Uninstall must not delete it
     if (game.coverSource !== 'manual') refetch = true;
   }
   if (coverSrc) {
@@ -707,6 +768,64 @@ ipcMain.handle('game:remove', (_e, id) => {
   saveLibrary(next);
   if (game && cloud.isSignedIn()) cloud.deleteGame(game.name).catch(() => {});
   return withStatus(next);
+});
+
+// Folders Uninstall must never delete (or delete a parent of).
+function sharedFolders() {
+  const out = [];
+  for (const n of ['home', 'desktop', 'documents', 'downloads', 'music', 'pictures', 'videos', 'appData', 'userData', 'temp']) {
+    try { out.push(app.getPath(n)); } catch {}
+  }
+  for (const k of ['ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432', 'SystemRoot', 'windir', 'ProgramData', 'PUBLIC']) if (process.env[k]) out.push(process.env[k]);
+  out.push(dataDir());
+  return out;
+}
+
+// Steam-style uninstall: delete the game's files but keep it in the library so it can be installed again.
+ipcMain.handle('game:uninstall', async (_e, id) => {
+  const games = loadLibrary();
+  const game = games.find((g) => g.id === id);
+  if (!game || uninstalling.has(id)) return { ok: false, games: withStatus(games) };
+  const plan = game.install
+    ? uninstallTarget(game, [loadSettings().downloadDir || path.join(dataDir(), 'Games'), game.install.root])
+    : legacyUninstallTarget(game.path, sharedFolders());
+  if (plan.error) return { ok: false, error: plan.error, games: withStatus(games) };
+  const what = plan.kind === 'dir' ? `the folder\n${plan.target}` : `the file\n${plan.target}`;
+  const { response } = await dialog.showMessageBox(win, {
+    type: 'warning',
+    title: 'Uninstall game',
+    message: `Uninstall ${game.name}?`,
+    detail: `This deletes ${what}\n\n${game.install ? 'The game stays in your library and you can install it again later.' : "The game stays in your library, but Zruxr didn't download it, so it can't re-download it for you. Check the folder above is right first."} Saves stored inside the game folder will be lost.`,
+    buttons: ['Uninstall', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+  });
+  if (response !== 0) return { ok: false, cancelled: true, games: withStatus(loadLibrary()) };
+
+  const entry = running.get(id);
+  if (entry) { recordSession(id); killTree(entry.child); await new Promise((r) => setTimeout(r, 800)); }
+  uninstalling.add(id);
+  pushLibrary();
+  try {
+    await fs.promises.rm(plan.target, { recursive: true, force: true, maxRetries: 5, retryDelay: 400 });
+    if (fs.existsSync(plan.target)) throw new Error('Some files are still in use.');
+    if (sourcesApi) sourcesApi.forgetPath(plan.target);
+  } catch (e) {
+    uninstalling.delete(id);
+    pushLibrary();
+    return { ok: false, error: `Could not delete the files (${e.code || e.message}). Close the game and try again.`, games: withStatus(loadLibrary()) };
+  }
+  const fresh = loadLibrary();
+  const g = fresh.find((x) => x.id === id);
+  if (g) {
+    g.path = '';
+    g.uninstalled = true;
+    delete g.install;
+    saveLibrary(fresh);
+  }
+  uninstalling.delete(id);
+  return { ok: true, games: withStatus(fresh) };
 });
 
 ipcMain.handle('game:launch', (_e, id) => launchGame(id));
@@ -745,13 +864,14 @@ ipcMain.handle('settings:set', (_e, patch) => {
   if (typeof patch.showDiscover === 'boolean') next.showDiscover = patch.showDiscover;
   if (typeof patch.showDownloads === 'boolean') next.showDownloads = patch.showDownloads;
   if (typeof patch.promoDismissed === 'boolean') next.promoDismissed = patch.promoDismissed;
+  if (THEME_BARS[patch.theme]) { next.theme = patch.theme; applyThemeBar(patch.theme); }
   if (typeof patch.downloadDir === 'string' && path.isAbsolute(patch.downloadDir)) next.downloadDir = patch.downloadDir;
   if (typeof patch.startWithWindows === 'boolean') {
     next.startWithWindows = patch.startWithWindows;
     applyStartWithWindows(patch.startWithWindows);
   }
   fs.mkdirSync(dataDir(), { recursive: true });
-  fs.writeFileSync(settingsFile(), JSON.stringify(next, null, 2));
+  writeFileAtomic(settingsFile(), JSON.stringify(next, null, 2));
   return next;
 });
 
@@ -860,12 +980,19 @@ function scheduleSync(delay = 3000) {
 
 ipcMain.handle('account:get', () => ({ ...accountState }));
 
+const authThrottle = makeThrottle();
+const authWaitMsg = (s) => `Too many tries. Wait ${s} second${s === 1 ? '' : 's'} and try again.`;
+
 ipcMain.handle('account:signIn', async (_e, { username, password } = {}) => {
+  const wait = authThrottle.wait();
+  if (wait) return { ok: false, error: authWaitMsg(wait) };
   try {
-    await cloud.signIn(String(username || '').trim(), String(password || ''));
+    await cloud.signIn(String(username || '').trim().slice(0, 64), String(password || '').slice(0, 256));
   } catch (err) {
+    if (/wrong username or password/i.test(err.message)) authThrottle.fail();
     return { ok: false, error: err.message };
   }
+  authThrottle.ok();
   accountState.email = cloud.email();
   accountState.error = null;
   publishAccount();
@@ -874,8 +1001,11 @@ ipcMain.handle('account:signIn', async (_e, { username, password } = {}) => {
 });
 
 ipcMain.handle('account:signUp', async (_e, { username, password } = {}) => {
+  const wait = authThrottle.wait();
+  if (wait) return { ok: false, error: authWaitMsg(wait) };
+  if (String(password || '').length < 8) return { ok: false, error: 'Use at least 8 characters for your password.' };
   try {
-    const res = await cloud.signUp(String(username || '').trim(), String(password || ''));
+    const res = await cloud.signUp(String(username || '').trim().slice(0, 64), String(password || '').slice(0, 256));
     if (!res.signedIn) return { ok: true, needsConfirm: true };
   } catch (err) {
     return { ok: false, error: err.message };
@@ -907,13 +1037,13 @@ function createWindow() {
     height: 780,
     minWidth: 860,
     minHeight: 540,
-    backgroundColor: '#090909',
+    backgroundColor: (THEME_BARS[loadSettings().theme] || THEME_BARS.dark)[0],
     title: 'Zruxr',
     icon: path.join(__dirname, 'build', 'icon.png'),
     autoHideMenuBar: true,
     // Dark custom title bar: window controls overlay the top-right corner.
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#090909', symbolColor: '#8c8c8c', height: 48 },
+    titleBarOverlay: { color: (THEME_BARS[loadSettings().theme] || THEME_BARS.dark)[0], symbolColor: (THEME_BARS[loadSettings().theme] || THEME_BARS.dark)[1], height: 48 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -937,7 +1067,23 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'cover', privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
 
+// One copy at a time: two copies writing library.json would corrupt it. A second launch just focuses the first.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
+  });
+}
+
+// Belt and braces: nothing in the launcher may open a <webview>, whatever a page asks for.
+app.on('web-contents-created', (_e, contents) => {
+  contents.on('will-attach-webview', (ev) => ev.preventDefault());
+});
+
 app.whenReady().then(() => {
+  if (!gotLock) return;
   protocol.handle('cover', (request) => {
     const url = new URL(request.url);
     const fileName = path.basename(decodeURIComponent(url.pathname));
@@ -949,23 +1095,24 @@ app.whenReady().then(() => {
 
   cloud.init();
   updater.init(send);
-  sources.init({
+  sourcesApi = sources.init({
     send,
     dataDir,
     getDownloadDir: () => loadSettings().downloadDir || path.join(dataDir(), 'Games'), // default: inside the launcher's own folder
     setDownloadDir: (dir) => {
       const next = { ...loadSettings(), downloadDir: dir };
-      fs.writeFileSync(settingsFile(), JSON.stringify(next, null, 2));
+      writeFileAtomic(settingsFile(), JSON.stringify(next, null, 2));
     },
     allowPath: (p) => pickedPaths.add(p),
     getWindow: () => win,
     // Called by the downloader when a game finishes downloading/unpacking: adds it to the library
     // (skips it if that exact file is already there).
-    addGame: async (gamePath, name) => {
+    getGame: (id) => loadLibrary().find((g) => g.id === id),
+    addGame: async (gamePath, name, meta) => {
       const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
       if (loadLibrary().some((g) => same(g.path, gamePath))) return true;
       pickedPaths.add(gamePath);
-      await addGameEntry(gamePath, name);
+      await addGameEntry(gamePath, name, meta);
       scheduleSync();
       pushLibrary();
       return true;

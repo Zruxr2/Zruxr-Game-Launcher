@@ -27,6 +27,7 @@ If Electron says it "failed to install correctly", see the note in the [README](
 | `main.js` | App window, library, settings, cover art, wiring of everything below |
 | `preload.js` | The only bridge between the UI and the main process |
 | `renderer/` | The UI (HTML, CSS, JS) |
+| `install-utils.js` | Uninstall safety rules, speed and time-left maths, crash-safe file saving, sign-in throttle |
 | `scanner.js` | Finds installed games (Steam, Epic, GOG, folders) |
 | `sources.js`, `sources-parse.js` | Sources, the download manager, host pages, unpacking hand-off |
 | `resolvers.js` | Which links can be downloaded, host names/order, `HOST_ISSUES` |

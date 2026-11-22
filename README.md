@@ -45,6 +45,8 @@ Most launchers want you to buy things. Zruxr doesn't sell anything. It's for the
 - **Sources.** Press **Add source** and paste a web address: a JSON list (including Hydra-style lists), a web page or open folder that links to files, or a direct file link. A **Downloads** tab shows a cover and a big Download button for every game. Press refresh on a source to re-read it.
 - **Search and sort.** Search the list and sort it by source order, name (A to Z or Z to A), size (largest or smallest) or date (newest or oldest). Your choice is remembered.
 - **Pick the host and the folder.** Pixeldrain downloads by itself. Gofile, FileKeeper, BuzzHeavier, FuckingFast and MediaFire open in a panel inside the launcher that tells you what to press ("Press Download and wait"; on FileKeeper, the button under the main Download button) and shows a big orange warning when a popup was blocked. Hosts that make you solve captchas are not used. Choose where each game is saved (inside Zruxr's own folder by default).
+- **Live download stats.** Every running download shows a speed graph for the last minute, current and average speed, time left, elapsed time and when it will finish, plus the combined speed of all downloads.
+- **Uninstall like Steam.** **Uninstall** deletes a game's files but keeps it in your library, with its play time and cover. Games Zruxr downloaded get an **Install** button to download them again. Uninstall shows you the exact folder first and refuses shared or system folders (Downloads, Documents, Program Files, drive roots). **Remove from library** removes the game completely.
 - **It finishes the job.** Zruxr unpacks `.rar` and `.zip` files in the background, tidies the folder, finds the game's `.exe` and adds it to your library. Up to three downloads run at once, with pause, resume and cancel.
 - **Fallbacks.** If a host won't work in the panel: switch host, **Open in browser**, or **I downloaded it** to hand over a file you saved yourself.
 
@@ -54,8 +56,9 @@ See [Downloads in detail](#downloads-in-detail).
 
 - **Updates itself.** The installed version checks GitHub Releases, downloads new versions in the background and shows "New version available" with progress, then **Restart now** (or installs when you close Zruxr). **Settings > Updates** has a **Check now** button and shows the reason if a check fails.
 - **Accounts are optional.** Zruxr works fully without one. With a free account, your game list and play time follow you between PCs.
+- **Themes.** Dark, Midnight, Violet, Crimson, Forest or Light, in Settings.
 - **Yours to tweak.** Cover size, start with Windows, a startup animation you can turn off, and switches for the Discover row and the Downloads tab.
-- **Safe by design.** The window can only run files you picked in the launcher's own dialogs, host pages run sandboxed and can only reach public web pages, and archives can't write outside their own folder.
+- **Safe by design.** Your sign-in is encrypted with Windows' own keychain and never reaches the page, repeated wrong passwords lock sign-in for a minute, your library is saved crash-safely, only one copy of Zruxr runs at a time, and the page has a strict content policy. The window can only run files you picked in the launcher's own dialogs, host pages run sandboxed and can only reach public web pages, and archives can't write outside their own folder.
 
 ## Screenshots
 
@@ -230,6 +233,8 @@ If you fork this and want your own backend, create a Supabase project, then repl
 - [x] Hosts that need a click, shown inside the launcher
 - [x] Sorting and searching on the Downloads page
 - [x] "Change .exe" help for games that won't start
+- [x] Uninstall that keeps the game in your library
+- [x] Live download stats and themes
 - [ ] Collections and tags
 - [ ] Controller-friendly "big screen" mode
 
@@ -242,8 +247,8 @@ To publish an update, either let GitHub do it or do it by hand.
 **Automatic (recommended).** Bump `version` in `package.json`, add the version to [CHANGELOG.md](CHANGELOG.md), commit, then push a tag that matches it:
 
 ```bash
-git tag v1.2.5
-git push origin v1.2.5
+git tag v1.2.6
+git push origin v1.2.6
 ```
 
 The **Release** workflow (`.github/workflows/release.yml`) runs the tests, checks the tag matches `package.json`, builds the installer and portable `.exe` on Windows, and publishes them with `latest.yml` and the `.blockmap` to a normal (non-draft) GitHub release. The release text is taken from `docs/release-notes/vX.Y.Z.md` if that file exists. The animated `Zruxr-Installer` is built locally with `npm run dist` and can be added to the release by hand.
@@ -259,6 +264,10 @@ The **Release** workflow (`.github/workflows/release.yml`) runs the tests, check
 5. **Only the installed version updates.** The portable `.exe` and `npm start` never do.
 6. **The old version must already contain the updater.** A version built before auto-update existed has to be reinstalled by hand once.
 7. Open **Settings > Updates** or `updater.log` in the data folder on an old copy: it says what the updater saw and why it failed.
+
+## Antivirus keeps deleting a download
+
+Zruxr shows a red warning in **Downloads** when a finished file disappears soon after it was saved, with a button that opens Windows Security. Open **Protection history** to see what was removed and why. Zruxr will never tell you to switch your antivirus off. If you trust a file, restore it and exclude only the Zruxr download folder. Running Zruxr as administrator does not help, and makes any bad file more dangerous.
 
 ## Responsible use
 

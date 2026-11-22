@@ -19,6 +19,7 @@ const { Worker } = require('worker_threads');
 const { parseSource, isHttpUrl, titleFromUrl, sizeText, searchTitle } = require('./sources-parse');
 const { onlyDownloadable, resolveLink, canDownload, canOpenInBrowser, canUse, isPublicWebUrl, describeHosts, hostHint, popupText } = require('./resolvers');
 const { findGameExe, settleExtracted } = require('./postprocess');
+const { recordSpeed, writeFileAtomic } = require('./install-utils');
 
 const MAX_SOURCE_BYTES = 8 * 1024 * 1024; // a source list is text; never read more than this
 const MAX_ITEMS_PER_SOURCE = 20000; // games kept per source, counted AFTER links we can't use are dropped
@@ -38,7 +39,7 @@ const UA = 'Zruxr-Launcher';
 
 const id12 = (s) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 12);
 
-function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGame, getWindow, findCover, searchSteam, coverUrlsFor, downloadFirstImage, coversDir, computeTint }) {
+function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGame, getGame, getWindow, findCover, searchSteam, coverUrlsFor, downloadFirstImage, coversDir, computeTint }) {
   const sourcesFile = () => path.join(dataDir(), 'sources.json');
   const cacheDir = () => path.join(dataDir(), 'sources-cache');
   const downloadsFile = () => path.join(dataDir(), 'downloads.json');
@@ -53,7 +54,7 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
   }
   function writeJson(file, data) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(data));
+    writeFileAtomic(file, JSON.stringify(data));
   }
 
   const loadSources = () => readJson(sourcesFile(), []);
@@ -338,6 +339,13 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
       archivePath: '', // the downloaded archive while it is waiting to be / being unpacked
       tmpDir: '', // temporary folder used while unpacking
       extractPct: 0,
+      verifiedAt: 0, // when a finished file was last seen on disk
+      missing: false, // a finished file vanished soon after it was saved (usually antivirus)
+      reinstallOf: '', // library game id when this download is re-installing an uninstalled game
+      startedAt: 0,
+      avgSpeed: 0,
+      peakSpeed: 0,
+      speedHistory: [],
       addedToLibrary: false,
       note: '',
       addedAt: new Date().toISOString(),
@@ -351,7 +359,7 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
   }
 
   function persist() {
-    writeJson(downloadsFile(), [...downloads.values()].slice(-200));
+    writeJson(downloadsFile(), [...downloads.values()].slice(-200).map(({ speedHistory, ...rest }) => rest));
   }
 
   let pushTimer = null;
@@ -555,6 +563,8 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
         const now = Date.now();
         if (now - lastTick >= 500) {
           d.speed = Math.round(((d.received - lastBytes) * 1000) / (now - lastTick));
+          if (!d.startedAt) d.startedAt = now;
+          recordSpeed(d, d.speed);
           lastTick = now;
           lastBytes = d.received;
           push();
@@ -635,9 +645,15 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
     }
   }
 
-  async function autoAdd(d, exePath) {
+  async function autoAdd(d, exePath, installDir) {
     try {
-      await addGame(exePath, searchTitle(d.title) || d.title || path.basename(exePath, '.exe'));
+      // Remember where it went and how to get it again, so it can be uninstalled and reinstalled later.
+      const meta = {
+        install: installDir ? { dir: installDir, root: path.dirname(installDir) } : { file: exePath, root: path.dirname(exePath) },
+        dl: { title: d.title, url: d.url, alts: d.alts || [], sha256: d.sha256 || '', sourceName: d.sourceName || '', dir: d.dir || '' },
+        reinstallOf: d.reinstallOf || '',
+      };
+      await addGame(exePath, searchTitle(d.title) || d.title || path.basename(exePath, '.exe'), meta);
       d.addedToLibrary = true;
     } catch {
       d.note = 'Downloaded, but it could not be added to the library automatically.';
@@ -688,7 +704,7 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
       if (found.exe) {
         d.filePath = found.exe;
         d.fileName = path.basename(found.exe);
-        await autoAdd(d, found.exe);
+        await autoAdd(d, found.exe, dest);
       } else {
         d.filePath = dest;
         d.fileName = path.basename(dest);
@@ -901,6 +917,8 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
       const now = Date.now();
       if (now - lastTick >= 500) {
         d.speed = item.isPaused() ? 0 : Math.round(((d.received - lastBytes) * 1000) / (now - lastTick));
+        if (!d.startedAt) d.startedAt = now;
+        recordSpeed(d, d.speed);
         lastTick = now;
         lastBytes = d.received;
       }
@@ -1017,7 +1035,7 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
     return true;
   });
 
-  function enqueue({ url, title, sourceName, sha256, alts, dir }) {
+  function enqueue({ url, title, sourceName, sha256, alts, dir, reinstallOf }) {
     if (!isHttpUrl(url) || String(url).length > 4096) throw new Error('That download address is not valid.');
     const direct = canDownload(url);
     if (!direct && !canOpenInBrowser(url)) throw new Error('That kind of link cannot be downloaded. It must be an https link to a file or a download page.');
@@ -1034,6 +1052,7 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
       sourceName: String(sourceName || '').slice(0, 100),
       sha256: /^[a-f0-9]{64}$/i.test(sha256 || '') ? sha256.toLowerCase() : '',
       dir: dir || '',
+      reinstallOf: typeof reinstallOf === 'string' ? reinstallOf : '',
     });
     downloads.set(d.id, d);
     persist();
@@ -1076,6 +1095,63 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
       return enqueue({ url: links[pick], title: item.title, sourceName: source.name, sha256: item.sha256, alts: rest, dir });
     }
     return enqueue({ url: String(req.url || '').trim(), title: req.title, sourceName: 'Direct link', alts: req.alts, dir }); // alts are re-checked in enqueue
+  });
+
+  // Install again a game that was uninstalled: fresh links from the source if it still lists the game,
+  // otherwise the links saved when it was first downloaded.
+  ipcMain.handle('game:install', (_e, gameId) => {
+    const g = getGame && getGame(gameId);
+    if (!g || !g.dl || !g.dl.url) throw new Error('Zruxr does not know where to download this game from. Use Locate to point to it instead.');
+    for (const d of downloads.values()) {
+      if (d.reinstallOf === gameId && ['queued', 'waiting', 'downloading', 'paused', 'extracting'].includes(d.status)) return publicEntry(d);
+    }
+    const saved = [g.dl.url, ...(g.dl.alts || [])];
+    let links = saved;
+    let sha = g.dl.sha256;
+    try {
+      for (const s of loadSources()) {
+        const item = loadItems(s.id).find((i) => {
+          const r = onlyDownloadable([i])[0];
+          return r && [r.url, ...r.alts].some((u) => saved.includes(u));
+        });
+        if (item) {
+          const r = onlyDownloadable([item])[0];
+          links = [r.url, ...r.alts];
+          sha = item.sha256 || sha;
+          break;
+        }
+      }
+    } catch {}
+    // Only reuse a custom folder if it still exists; otherwise fall back to the default folder.
+    const dir = g.dl.dir && chosenDirs.has(g.dl.dir) ? g.dl.dir : '';
+    return enqueue({ url: links[0], title: g.dl.title || g.name, sourceName: g.dl.sourceName, sha256: sha, alts: links.slice(1), dir, reinstallOf: gameId });
+  });
+
+  // Antivirus often deletes a file moments after it is saved, and the download then just looks like it
+  // vanished. Watch finished files for a while; if one that was there goes missing, say so.
+  const WATCH_MS = 15 * 60 * 1000;
+  setInterval(() => {
+    let changed = false;
+    for (const d of downloads.values()) {
+      if (d.status !== 'done' || !d.filePath || d.missing) continue;
+      let there = false;
+      try { there = fs.existsSync(d.filePath); } catch {}
+      if (there) {
+        if (!d.verifiedAt) { d.verifiedAt = Date.now(); changed = true; }
+      } else if (d.verifiedAt && Date.now() - d.verifiedAt < WATCH_MS) {
+        d.missing = true;
+        d.note = 'This file disappeared right after downloading. Your antivirus probably removed it.';
+        changed = true;
+      }
+    }
+    if (changed) { persist(); push(true); }
+  }, 4000).unref();
+
+  // Opens the Windows Security page that lists what the antivirus removed. Fixed address, nothing from the page.
+  ipcMain.handle('downloads:openSecurity', () => {
+    if (process.platform !== 'win32') return false;
+    shell.openExternal('windowsdefender://threat').catch(() => {});
+    return true;
   });
 
   ipcMain.handle('downloads:pause', (_e, did) => {
@@ -1210,6 +1286,17 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
     for (const c of controllers.values()) c.abort();
     persist();
   });
+
+  return {
+    // The person deleted this file/folder on purpose (Uninstall): don't report it as removed by antivirus.
+    forgetPath(target) {
+      const t = path.resolve(target).toLowerCase();
+      for (const d of downloads.values()) {
+        const f = d.filePath && path.resolve(d.filePath).toLowerCase();
+        if (f && (f === t || f.startsWith(t + path.sep))) { d.verifiedAt = 0; d.missing = false; }
+      }
+    },
+  };
 }
 
 module.exports = { init };

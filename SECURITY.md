@@ -17,6 +17,7 @@ You'll get a reply as soon as possible, and credit in the release notes if you'd
 - Anything that lets a downloaded file, archive, source list or web page write outside its intended folder, run code, or read files it shouldn't.
 - Escapes from the sandboxed host panel (pages reaching `localhost`, the local network, `file:` addresses or the launcher itself).
 - Problems with how account sign-in sessions are stored or sent.
+- Anything that lets **Uninstall** delete files outside the game's own folder.
 
 ## Out of scope
 

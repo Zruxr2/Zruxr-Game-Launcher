@@ -6,6 +6,26 @@ For versions before 1.2.4, see the [Releases](../../releases) page.
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-11-22
+
+Uninstall like Steam, live download stats, themes, and a GTA VI banner.
+
+### Added
+
+- **Uninstall keeps the game in your library.** For games Zruxr downloaded, **Uninstall** (after a confirm box) deletes the game's files but leaves the game in your library, with its play time, cover and favorite. It shows **Not installed** with an **Install** button, which downloads it again and puts it back in the same spot. **Remove from library** still removes it fully. Only things Zruxr itself downloaded are ever deleted, and only inside the download folder.
+- **Download stats.** Each running download shows a speed graph (last minute), current and average speed, time left, elapsed time, when it will finish, and the total speed of all downloads.
+- **Themes.** Settings, Appearance: Dark, Midnight, Violet, Crimson, Forest and Light. The window's title bar changes colour too.
+- **"Antivirus removed it" warning.** If a finished download disappears within 15 minutes of being saved, the Downloads list says so, with an **Open Windows Security** button and a reminder to only restore files you trust.
+- **"GTA VI coming soon" banner** at the top of the Library (shown once you've added a source).
+- **Uninstall works on every game with a file**, including ones added by hand or with Scan PC. For those, Zruxr works out the game's own folder, shows you the exact path to confirm, and refuses shared or system folders (Downloads, Documents, Program Files, a drive root and so on). It can't re-download games it didn't download itself.
+
+### Security
+
+- **Password guessing is slowed down:** five wrong sign-ins in a row lock sign-in for a minute.
+- **Files are saved safely.** The library, settings, profile and source lists are written to a temporary file first, then swapped in, so a crash or power cut can't corrupt them.
+- **Only one Zruxr can run at a time** (a second launch just brings the first to the front), so two copies can't overwrite each other's data.
+- **Stricter page security policy:** the launcher window can no longer load plugins, frames, forms or make its own network calls.
+
 ## [1.2.5] - 2026-11-10
 
 A fix for downloads adding the wrong program to your library, and help for games that won't start.

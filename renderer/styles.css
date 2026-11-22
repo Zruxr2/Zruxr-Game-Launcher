@@ -1729,3 +1729,96 @@ button.pop-avatar:active { transform: scale(.95); }
 .exe-opt.selected { border-color: #fff; background: #1f1f1f; }
 .exe-opt-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .exe-opt-meta { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+
+/* ---------- Grand Theft Auto VI "coming soon" banner (library) ---------- */
+.gta {
+  position: relative; isolation: isolate; overflow: hidden; margin: 0 0 30px; height: clamp(300px, 30vw, 400px);
+  display: flex; align-items: flex-end; justify-content: flex-end; border-radius: 20px; border: 1px solid rgba(255, 255, 255, .09);
+  background: #1a1030;
+  animation: gtaIn .7s var(--ease) both;
+}
+.gta[hidden] { display: none; }
+.gta-art { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -2; object-fit: cover; object-position: 50% 10%; user-select: none; }
+/* a soft dark corner so the words stay readable on the right side */
+.gta-shade {
+  position: absolute; inset: 0; z-index: -1;
+  background:
+    linear-gradient(270deg, rgba(10, 5, 22, .82) 0%, rgba(10, 5, 22, .5) 28%, rgba(10, 5, 22, 0) 55%),
+    linear-gradient(0deg, rgba(10, 5, 22, .45) 0%, rgba(10, 5, 22, 0) 35%);
+}
+.gta-content { position: relative; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; padding: 32px 44px; text-align: right; }
+.gta-pill {
+  position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 8px; padding: 6px 13px; border-radius: 999px;
+  background: rgba(10, 5, 22, .62); border: 1px solid rgba(255, 255, 255, .22); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #fff;
+}
+.gta-pill i { width: 7px; height: 7px; border-radius: 50%; background: #ff5a9a; box-shadow: 0 0 10px 2px rgba(255, 90, 154, .8); animation: gtaDot 1.8s ease-in-out infinite; }
+.gta-title { margin: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-family: var(--display); line-height: .9; color: #fff; text-shadow: 0 3px 24px rgba(0, 0, 0, .6); }
+.gta-title span { font-size: clamp(14px, 1.6vw, 20px); font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
+.gta-title strong { font-size: clamp(64px, 8vw, 104px); font-weight: 800; letter-spacing: -.03em; line-height: .88; }
+@keyframes gtaIn { from { opacity: 0; transform: translateY(10px) scale(.992); } to { opacity: 1; transform: none; } }
+@keyframes gtaDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.8); } }
+@media (max-width: 760px) {
+  .gta-content { padding: 20px 20px; }
+  .gta-art { object-position: 38% 20%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gta, .gta-pill i { animation: none; }
+}
+
+/* ---------- Uninstalled games + install progress ---------- */
+.game.not-installed .cover.has-art, .game.not-installed .cover { filter: saturate(.25) brightness(.8); transition: filter .25s var(--ease); }
+.game.not-installed:hover .cover { filter: saturate(.7) brightness(.95); }
+.install-overlay {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 4px;
+  padding: 14px;
+  background: rgba(9, 9, 9, .92);
+}
+.install-overlay { justify-content: center; }
+.io-title { font-family: var(--display); font-size: 26px; font-weight: 700; letter-spacing: -.02em; color: var(--text); }
+.io-sub { font-size: 12px; color: var(--muted); min-height: 16px; }
+.install-overlay .dl-bar { margin-top: 6px; }
+
+/* ---------- Download stats ---------- */
+.dl-active-total { margin-left: auto; margin-right: 12px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dl-stats { margin-top: 12px; }
+.dl-graph { position: relative; height: 64px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
+.dl-graph svg { display: block; width: 100%; height: 100%; }
+.dl-grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dl-area { fill: var(--accent); opacity: .14; }
+.dl-line { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.dl-graph-peak { position: absolute; top: 6px; right: 9px; font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dl-stat-row { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 10px; }
+.dl-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dl-stat-v { font-size: 13px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.dl-stat-l { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.dl-row .row-main { min-width: 0; flex: 1; }
+@media (max-width: 760px) { .dl-stat-row { gap: 8px 16px; } }
+
+/* ---------- Themes ---------- */
+:root[data-theme="midnight"] { --bg: #070b14; --panel: #0c1220; --panel-2: #111a2e; --line: #1b2640; --line-2: #2a3a5e; --text: #e6ecf8; --muted: #8191b0; --faint: #55637f; --accent: #6ea8ff; --accent-hover: #8fbcff; --accent-ink: #06101f; }
+:root[data-theme="violet"] { --bg: #0b0713; --panel: #120c1e; --panel-2: #1a1229; --line: #261a3b; --line-2: #38265a; --text: #efe9fa; --muted: #9a8cb5; --faint: #66587f; --accent: #b48cff; --accent-hover: #c8a8ff; --accent-ink: #12081f; }
+:root[data-theme="crimson"] { --bg: #0d0707; --panel: #150b0b; --panel-2: #1e1010; --line: #2b1616; --line-2: #422222; --text: #f4e9e9; --muted: #b09090; --faint: #7a5f5f; --accent: #ff6b6b; --accent-hover: #ff8a8a; --accent-ink: #200808; --danger: #ffb347; }
+:root[data-theme="forest"] { --bg: #070d09; --panel: #0c140f; --panel-2: #111c15; --line: #1a2a20; --line-2: #284134; --text: #e8f3ec; --muted: #86a091; --faint: #566c5f; --accent: #4fd18b; --accent-hover: #70e0a4; --accent-ink: #05180d; }
+:root[data-theme="light"] { color-scheme: light; --bg: #f5f5f7; --panel: #ffffff; --panel-2: #ececf0; --line: #dcdce2; --line-2: #c4c4cc; --text: #16161a; --muted: #62626e; --faint: #8c8c98; --accent: #16161a; --accent-hover: #000000; --accent-ink: #ffffff; --danger: #c8443a; }
+:root[data-theme="light"] .tab.active { color: var(--text); }
+
+.theme-row { flex-wrap: wrap; row-gap: 14px; }
+.themes { display: flex; flex-wrap: wrap; gap: 8px; flex-basis: 100%; }
+.theme-swatch {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 7px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--line-2); color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer;
+  transition: border-color .2s var(--ease), color .2s var(--ease);
+}
+.theme-swatch:hover { color: var(--text); }
+.theme-swatch[aria-pressed="true"] { border-color: var(--accent); color: var(--text); font-weight: 600; }
+.theme-swatch i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(128, 128, 128, .45); }
+.theme-swatch[data-theme="dark"] i { background: linear-gradient(135deg, #f0f0f0 50%, #090909 50%); }
+.theme-swatch[data-theme="midnight"] i { background: linear-gradient(135deg, #6ea8ff 50%, #070b14 50%); }
+.theme-swatch[data-theme="violet"] i { background: linear-gradient(135deg, #b48cff 50%, #0b0713 50%); }
+.theme-swatch[data-theme="crimson"] i { background: linear-gradient(135deg, #ff6b6b 50%, #0d0707 50%); }
+.theme-swatch[data-theme="forest"] i { background: linear-gradient(135deg, #4fd18b 50%, #070d09 50%); }
+.theme-swatch[data-theme="light"] i { background: linear-gradient(135deg, #16161a 50%, #f5f5f7 50%); }
+
+.row-hint { margin-top: 4px; font-size: 12px; color: var(--muted); line-height: 1.45; max-width: 60ch; }

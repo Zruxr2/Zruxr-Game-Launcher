@@ -140,13 +140,31 @@ function localFileUrl(p) {
   return 'file:///' + p.replace(/\\/g, '/').replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
 }
 
+// Install (again) a game that was uninstalled, from the links saved when it was first downloaded.
+async function installGame(g) {
+  try {
+    await window.launcher.installGame(g.id);
+    showToast(`Downloading ${g.name}…`, 'info');
+  } catch (err) {
+    showToast(cleanIpcError(err));
+  }
+}
+// The active re-install download for a library game, if any.
+function installJobFor(g) {
+  return downloadList.find((d) => d.reinstallOf === g.id && ['queued', 'waiting', 'downloading', 'paused', 'extracting', 'error'].includes(d.status));
+}
+function canInstall(g) { return !!(g.uninstalled && g.dl && g.dl.url); }
+
 function toggleGame(g) {
+  if (g.uninstalling) return;
+  if (!g.path && canInstall(g)) { if (!installJobFor(g)) installGame(g); return; }
   if (!g.path) { openDialog('edit', g); return; } // not on this PC yet: locate it
   if (g.running) window.launcher.stop(g.id);
   else window.launcher.launch(g.id).then(handleLaunchResult);
 }
 
 const ICON_PLAY = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M7.5 4.8v14.4a1 1 0 0 0 1.5.86l12-7.2a1 1 0 0 0 0-1.72l-12-7.2a1 1 0 0 0-1.5.86z"/></svg>';
+const ICON_DL = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>';
 const ICON_STOP = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg>';
 const ICON_STAR = '<svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 3.2l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z"/></svg>';
 
@@ -294,7 +312,7 @@ function renderFeatured() {
   text.append(eyebrow, name, meta);
 
   const btn = make('button', g.running ? 'btn lg' : 'btn primary lg');
-  btn.innerHTML = (g.running ? ICON_STOP : ICON_PLAY) + `<span>${g.running ? 'Stop' : g.path ? 'Play' : 'Locate'}</span>`;
+  btn.innerHTML = (g.running ? ICON_STOP : !g.path && canInstall(g) ? ICON_DL : ICON_PLAY) + `<span>${g.running ? 'Stop' : g.path ? 'Play' : canInstall(g) ? 'Install' : 'Locate'}</span>`;
   btn.addEventListener('click', () => toggleGame(g));
 
   featuredEl.append(cover, text, btn);
@@ -313,6 +331,7 @@ function renderGames(opts = {}) {
   else statsEl.textContent = `${plural(games.length, 'game')} · ${hoursText(total)} played`;
 
   const hasGames = games.length > 0;
+  document.getElementById('gtaBanner').hidden = !(tab === 'library' && sourcesReady && sourceList.length > 0); // the big "coming soon" banner: Library tab only
   emptyState.hidden = hasGames;
   libraryBlock.hidden = !hasGames;
   emptyFavs.hidden = !(isFav && hasGames && favs.length === 0);
@@ -362,15 +381,21 @@ function renderGames(opts = {}) {
     cover.appendChild(fav);
 
     const btn = make('button', 'cover-btn' + (g.running ? ' stop' : ''));
-    btn.innerHTML = (g.running ? ICON_STOP : ICON_PLAY) + `<span>${g.running ? 'Stop' : g.path ? 'Play' : 'Locate'}</span>`;
+    const job = !g.path ? installJobFor(g) : null;
+    const offerInstall = !g.path && canInstall(g);
+    btn.innerHTML = (g.running ? ICON_STOP : offerInstall ? ICON_DL : ICON_PLAY) + `<span>${g.running ? 'Stop' : g.path ? 'Play' : offerInstall ? 'Install' : 'Locate'}</span>`;
     btn.addEventListener('click', () => toggleGame(g));
-    cover.appendChild(btn);
+    if (!job && !g.uninstalling) cover.appendChild(btn);
 
     if (g.running) {
       cover.appendChild(make('div', 'running-tag', 'Running'));
+    } else if (g.uninstalling) {
+      cover.appendChild(make('div', 'running-tag remote', 'Uninstalling…'));
     } else if (!g.path) {
-      cover.appendChild(make('div', 'running-tag remote', 'Not on this PC'));
+      cover.appendChild(make('div', 'running-tag remote', g.uninstalled ? 'Not installed' : 'Not on this PC'));
     }
+    if (!g.path) el.classList.add('not-installed');
+    if (job || g.uninstalling) cover.appendChild(installOverlay(g, job));
     el.appendChild(cover);
 
     const name = make('div', 'game-name', g.name);
@@ -379,9 +404,11 @@ function renderGames(opts = {}) {
 
     const actions = make('div', 'game-actions');
     actions.append(
+      ...(canInstall(g) && !installJobFor(g) ? [linkButton('Install', () => installGame(g))] : []),
       linkButton(g.path ? 'Edit' : 'Locate', () => openDialog('edit', g)),
       ...(g.path ? [linkButton('Folder', () => window.launcher.showInFolder(g.id))] : []),
-      linkButton('Remove', () => removeGame(g), 'danger')
+      ...(g.canUninstall ? [linkButton('Uninstall', () => uninstallGame(g), 'danger')] : []),
+      linkButton(g.canUninstall || g.uninstalled ? 'Remove from library' : 'Remove', () => removeGame(g), 'danger')
     );
 
     el.append(name, meta, actions);
@@ -495,6 +522,7 @@ function renderSettings() {
   document.querySelectorAll('#sizeSeg button').forEach((b) => {
     b.setAttribute('aria-pressed', String(b.dataset.size === settings.cardSize));
   });
+  document.querySelectorAll('#themePicker button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.theme === (settings.theme || 'dark'))));
   document.getElementById('optSplash').checked = !!settings.startupAnimation;
   document.getElementById('optDiscover').checked = settings.showDiscover !== false;
   document.getElementById('optDownloads').checked = settings.showDownloads !== false;
@@ -517,8 +545,10 @@ function renderSettings() {
     : '';
 }
 
+const THEMES = ['dark', 'midnight', 'violet', 'crimson', 'forest', 'light'];
 function applySettings() {
   document.documentElement.dataset.size = settings.cardSize;
+  document.documentElement.dataset.theme = THEMES.includes(settings.theme) ? settings.theme : 'dark';
   sortSelect.value = settings.sort;
 }
 
@@ -527,6 +557,11 @@ async function saveSettings(patch) {
   applySettings();
   renderSettings();
 }
+
+document.getElementById('themePicker').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-theme]');
+  if (b) saveSettings({ theme: b.dataset.theme });
+});
 
 document.getElementById('sizeSeg').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-size]');
@@ -594,6 +629,14 @@ document.getElementById('launchHelpClose').addEventListener('click', () => { lau
 function handleLaunchResult(res) {
   if (res && res.ok) launchHelp.hidden = true;
   if (res && !res.ok) showToast(res.error || 'Could not launch the game.');
+}
+
+async function uninstallGame(g) {
+  const res = await window.launcher.uninstallGame(g.id); // the confirm box is a native one, shown by the main process
+  if (res.games) games = res.games;
+  if (res.ok) showToast(`${g.name} was uninstalled. It stays in your library.`, 'info');
+  else if (res.error) showToast(res.error);
+  render();
 }
 
 async function removeGame(g) {
@@ -1413,6 +1456,7 @@ function renderDlTabs() {
 function dlStatusText(d) {
   if (d.status === 'extracting') return d.extractPct ? `Unpacking… ${d.extractPct}%` : 'Unpacking…';
   if (d.status === 'done') {
+    if (d.missing) return d.note;
     const lib = d.addedToLibrary ? ' · Added to your library' : '';
     return d.note ? d.note : `Finished · ${bytesText(d.total || d.received)}${lib}`;
   }
@@ -1425,6 +1469,129 @@ function dlStatusText(d) {
   return `${d.status === 'paused' ? 'Paused · ' : ''}${bytesText(d.received) || '0 B'}${of}${pct}${speed}`;
 }
 
+// ---------- Download stats ----------
+function durText(sec) {
+  if (sec === null || sec === undefined || !isFinite(sec)) return '';
+  sec = Math.max(0, Math.round(sec));
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  if (sec < 3600) return `${m}m ${String(sec % 60).padStart(2, '0')}s`;
+  const h = Math.floor(sec / 3600);
+  if (h < 48) return `${h}h ${String(m % 60).padStart(2, '0')}m`;
+  return `${Math.floor(h / 24)}d ${h % 24}h`;
+}
+function etaOf(d) {
+  if (!d.total || d.total <= d.received) return null;
+  const sp = d.avgSpeed || d.speed;
+  return sp > 0 ? Math.ceil((d.total - d.received) / sp) : null;
+}
+function etaText(d) {
+  if (d.status === 'extracting') return 'Unpacking…';
+  if (d.status === 'paused') return 'Paused';
+  if (!d.total) return 'Size unknown';
+  const e = etaOf(d);
+  return e === null ? 'Calculating…' : `${durText(e)} left`;
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+// A small speed-over-time graph (about the last minute). Area + line, scaled to the peak.
+function speedGraph(d) {
+  const W = 300, H = 64, PAD = 4;
+  const data = (d.speedHistory || []).slice(-120);
+  const wrap = make('div', 'dl-graph');
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', `Download speed over the last minute. Now ${bytesText(d.speed) || '0 B'} per second.`);
+  for (const y of [H * 0.25, H * 0.5, H * 0.75]) {
+    const l = document.createElementNS(SVG_NS, 'line');
+    l.setAttribute('x1', 0); l.setAttribute('x2', W); l.setAttribute('y1', y); l.setAttribute('y2', y);
+    l.setAttribute('class', 'dl-grid');
+    svg.append(l);
+  }
+  if (data.length >= 2) {
+    const max = Math.max(...data, 1) * 1.15;
+    const step = W / 119; // always 120 slots wide, so the graph fills from the right
+    const x0 = W - (data.length - 1) * step;
+    const pts = data.map((v, i) => [x0 + i * step, H - PAD - (v / max) * (H - PAD * 2)]);
+    const line = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
+    const area = document.createElementNS(SVG_NS, 'path');
+    area.setAttribute('d', `${line} L${W} ${H} L${x0.toFixed(1)} ${H} Z`);
+    area.setAttribute('class', 'dl-area');
+    const stroke = document.createElementNS(SVG_NS, 'path');
+    stroke.setAttribute('d', line);
+    stroke.setAttribute('class', 'dl-line');
+    stroke.setAttribute('vector-effect', 'non-scaling-stroke');
+    svg.append(area, stroke);
+  }
+  wrap.append(svg);
+  wrap.append(make('span', 'dl-graph-peak', d.peakSpeed ? `peak ${bytesText(d.peakSpeed)}/s` : ''));
+  return wrap;
+}
+function statChip(label, value) {
+  const c = make('div', 'dl-stat');
+  c.append(make('span', 'dl-stat-v', value), make('span', 'dl-stat-l', label));
+  return c;
+}
+function dlStats(d) {
+  const box = make('div', 'dl-stats');
+  box.append(speedGraph(d));
+  const row = make('div', 'dl-stat-row');
+  const pct = d.total ? `${Math.floor((d.received / d.total) * 100)}%` : '—';
+  const e = etaOf(d);
+  const elapsed = d.startedAt ? (Date.now() - d.startedAt) / 1000 : 0;
+  row.append(
+    statChip('Speed', d.speed ? `${bytesText(d.speed)}/s` : '—'),
+    statChip('Average', d.avgSpeed ? `${bytesText(d.avgSpeed)}/s` : '—'),
+    statChip('Time left', d.total ? (e === null ? 'Calculating…' : durText(e)) : 'Unknown'),
+    statChip('Done', `${pct}${d.total ? ` · ${bytesText(d.received)} / ${bytesText(d.total)}` : ''}`),
+    statChip('Elapsed', elapsed ? durText(elapsed) : '—')
+  );
+  if (e !== null) {
+    const at = new Date(Date.now() + e * 1000);
+    row.append(statChip('Finishes at', at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })));
+  }
+  box.append(row);
+  return box;
+}
+
+// Progress shown on a library card while a game is being installed again (or its files are being deleted).
+function installOverlay(g, job) {
+  const o = make('div', 'install-overlay');
+  o.dataset.gid = g.id;
+  if (g.uninstalling) {
+    o.append(make('div', 'io-title', 'Uninstalling…'), make('div', 'io-sub', 'Deleting game files'));
+    return o;
+  }
+  const bar = make('div', 'dl-bar');
+  bar.append(make('span'));
+  o.append(make('div', 'io-title'), make('div', 'io-sub'), bar);
+  fillOverlay(o, job);
+  return o;
+}
+function fillOverlay(o, job) {
+  const title = o.querySelector('.io-title');
+  const sub = o.querySelector('.io-sub');
+  const fill = o.querySelector('.dl-bar > span');
+  if (!title || !job) return;
+  const pct = job.status === 'extracting' ? job.extractPct || 0 : job.total ? Math.min(100, (job.received / job.total) * 100) : 0;
+  title.textContent = job.status === 'error' ? 'Failed' : job.status === 'extracting' ? `Unpacking ${Math.floor(pct)}%` : job.status === 'downloading' ? `${Math.floor(pct)}%` : job.status === 'paused' ? 'Paused' : 'Starting…';
+  sub.textContent = job.status === 'error' ? job.error || 'Download failed.' : job.status === 'downloading' ? [etaText(job), job.speed ? `${bytesText(job.speed)}/s` : ''].filter(Boolean).join(' · ') : job.status === 'waiting' ? 'Finish the download in the window that opened' : '';
+  fill.style.width = `${Math.max(job.status === 'downloading' && !job.total ? 8 : 0, pct)}%`;
+}
+// Called on every download update: patch the cards in place, and rebuild only when a job starts or ends.
+let overlayKey = '';
+function updateInstallOverlays() {
+  const jobs = downloadList.filter((d) => d.reinstallOf);
+  const key = jobs.map((d) => `${d.reinstallOf}:${d.status === 'done' ? 'x' : 'a'}`).join(',');
+  if (key !== overlayKey) { overlayKey = key; if (tab === 'library') render(); return; }
+  for (const o of document.querySelectorAll('.install-overlay[data-gid]')) {
+    const job = jobs.find((d) => d.reinstallOf === o.dataset.gid && d.status !== 'done');
+    fillOverlay(o, job);
+  }
+}
+
 // A slim list of what's downloading (or just finished) so progress is visible without hunting for the card.
 function renderDlActive() {
   const list = [...downloadList].reverse();
@@ -1434,6 +1601,11 @@ function renderDlActive() {
 
   const head = make('div', 'dl-active-head');
   head.append(make('span', 'dl-active-title', 'Your downloads'));
+  const live = downloadList.filter((d) => d.status === 'downloading');
+  if (live.length) {
+    const total = live.reduce((n, d) => n + (d.speed || 0), 0);
+    head.append(make('span', 'dl-active-total', `${live.length} downloading · ${bytesText(total) || '0 B'}/s total`));
+  }
   if (list.some((d) => d.status === 'done' || d.status === 'error')) {
     const clear = make('button', 'link', 'Clear finished');
     clear.type = 'button';
@@ -1448,7 +1620,10 @@ function renderDlActive() {
     const row = make('div', `dl-row ${d.status}`);
     const main = make('div', 'row-main');
     main.append(make('div', 'row-title', d.fileName || d.title));
-    main.append(make('div', 'row-sub' + (d.status === 'error' ? ' err' : ''), dlStatusText(d)));
+    main.append(make('div', 'row-sub' + (d.status === 'error' || d.missing ? ' err' : ''), dlStatusText(d)));
+    if (d.missing) {
+      main.append(make('div', 'row-hint', 'Open Windows Security, then Protection history, to see what was removed and why. Only restore files you trust.'));
+    }
     if (d.status !== 'done') {
       const bar = make('div', 'dl-bar');
       const fill = make('span');
@@ -1456,12 +1631,15 @@ function renderDlActive() {
       bar.append(fill);
       main.append(bar);
     }
+    if (d.status === 'downloading') main.append(dlStats(d));
     const actions = make('div', 'row-actions');
     if (d.status === 'downloading' || d.status === 'queued') actions.append(miniBtn('Pause', () => window.launcher.downloadPause(d.id)));
     if (d.status === 'waiting') actions.append(miniBtn('Open page', () => window.launcher.downloadFocus(d.id), true));
     if (d.status === 'paused') actions.append(miniBtn('Resume', () => window.launcher.downloadResume(d.id), true));
     if (d.status === 'error') actions.append(miniBtn('Retry', () => window.launcher.downloadResume(d.id), true));
-    if (d.status === 'done') {
+    if (d.status === 'done' && d.missing) {
+      actions.append(miniBtn('Open Windows Security', () => window.launcher.openSecurity(), true));
+    } else if (d.status === 'done') {
       actions.append(miniBtn('Show', () => window.launcher.downloadShow(d.id)));
       if (!d.addedToLibrary && /\.(exe|bat|cmd)$/i.test(d.fileName)) {
         actions.append(miniBtn('Add to library', async () => {
@@ -1937,6 +2115,7 @@ document.getElementById('pickDlDir').addEventListener('click', async () => {
 
 window.launcher.onDownloads((list) => {
   downloadList = list;
+  updateInstallOverlays();
   updateDownloads(); // refreshes the tab count, and the cards/strip when the Downloads tab is open
 });
 window.launcher.downloadDir().then((d) => { downloadDir = d; if (tab === 'settings') renderSettings(); }).catch(() => {});
@@ -1996,3 +2175,4 @@ document.getElementById('updateLater').addEventListener('click', () => {
   updateDismissed = true; // it still installs by itself the next time Zruxr closes
   updateBar.hidden = true;
 });
+

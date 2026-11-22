@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' cover: file: data:; style-src 'self'; font-src 'self'; script-src 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' cover: file: data:; style-src 'self'; font-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; connect-src 'none'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Zruxr</title>
   <link rel="stylesheet" href="styles.css" />
@@ -39,6 +39,15 @@
     <main id="main">
       <!-- ================= Library / Favorites ================= -->
       <div id="pageGames" class="page">
+        <section id="gtaBanner" class="gta" aria-label="Grand Theft Auto VI, coming soon to Zruxr" hidden>
+          <img class="gta-art" src="assets/gta6.jpg" alt="" draggable="false" />
+          <div class="gta-shade" aria-hidden="true"></div>
+          <div class="gta-content">
+            <span class="gta-pill"><i aria-hidden="true"></i>Coming soon to Zruxr</span>
+            <h2 class="gta-title"><span>Grand Theft Auto</span><strong>VI</strong></h2>
+          </div>
+        </section>
+
         <section class="hero">
           <div class="hero-text rise" data-rise="1">
             <h1 id="greeting">Hello.</h1>
@@ -232,6 +241,20 @@
           <section class="setting-group">
             <h3>Appearance</h3>
             <div class="setting-card">
+              <div class="setting-row theme-row">
+                <div class="setting-text">
+                  <div class="setting-name">Theme</div>
+                  <div class="setting-desc">Pick the colours Zruxr uses.</div>
+                </div>
+                <div class="themes" id="themePicker" role="group" aria-label="Theme">
+                  <button type="button" class="theme-swatch" data-theme="dark" aria-label="Dark" title="Dark"><i></i><span>Dark</span></button>
+                  <button type="button" class="theme-swatch" data-theme="midnight" aria-label="Midnight" title="Midnight"><i></i><span>Midnight</span></button>
+                  <button type="button" class="theme-swatch" data-theme="violet" aria-label="Violet" title="Violet"><i></i><span>Violet</span></button>
+                  <button type="button" class="theme-swatch" data-theme="crimson" aria-label="Crimson" title="Crimson"><i></i><span>Crimson</span></button>
+                  <button type="button" class="theme-swatch" data-theme="forest" aria-label="Forest" title="Forest"><i></i><span>Forest</span></button>
+                  <button type="button" class="theme-swatch" data-theme="light" aria-label="Light" title="Light"><i></i><span>Light</span></button>
+                </div>
+              </div>
               <div class="setting-row">
                 <div class="setting-text">
                   <div class="setting-name">Cover size</div>
