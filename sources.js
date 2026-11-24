@@ -11,7 +11,7 @@
 //  - downloaded files are never run automatically
 //  - a link that answers with a web page instead of a file is reported, not saved
 
-const { app, ipcMain, dialog, shell, WebContentsView, session } = require('electron');
+const { app, ipcMain, dialog, shell, WebContentsView, session, clipboard } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -20,6 +20,8 @@ const { parseSource, isHttpUrl, titleFromUrl, sizeText, searchTitle } = require(
 const { onlyDownloadable, resolveLink, canDownload, canOpenInBrowser, canUse, isPublicWebUrl, describeHosts, hostHint, popupText } = require('./resolvers');
 const { findGameExe, settleExtracted } = require('./postprocess');
 const { recordSpeed, writeFileAtomic } = require('./install-utils');
+const { categorize } = require('./categories');
+const { spotlightScript } = require('./host-auto');
 
 const MAX_SOURCE_BYTES = 8 * 1024 * 1024; // a source list is text; never read more than this
 const MAX_ITEMS_PER_SOURCE = 20000; // games kept per source, counted AFTER links we can't use are dropped
@@ -39,7 +41,7 @@ const UA = 'Zruxr-Launcher';
 
 const id12 = (s) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 12);
 
-function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGame, getGame, getWindow, findCover, searchSteam, coverUrlsFor, downloadFirstImage, coversDir, computeTint }) {
+function init({ send, dataDir, getDownloadDir, getSimpleHost, setDownloadDir, allowPath, addGame, getGame, getWindow, findCover, searchSteam, coverUrlsFor, downloadFirstImage, coversDir, computeTint }) {
   const sourcesFile = () => path.join(dataDir(), 'sources.json');
   const cacheDir = () => path.join(dataDir(), 'sources-cache');
   const downloadsFile = () => path.join(dataDir(), 'downloads.json');
@@ -215,7 +217,7 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
   ipcMain.handle('sources:items', () => {
     const out = [];
     for (const s of loadSources()) {
-      for (const it of loadItems(s.id)) out.push({ ...it, sourceId: s.id, sourceName: s.name });
+      for (const it of loadItems(s.id)) out.push({ ...it, sourceId: s.id, sourceName: s.name, sections: categorize(it) });
     }
     const visibleGames = onlyDownloadable(out);
     return visibleGames;
@@ -735,6 +737,15 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
   const hostItems = new Map(); // download id -> Electron DownloadItem
   let hostSession = null;
   let activeHost = null; // download id whose page is on screen right now
+  const hostLog = new Map(); // download id -> last few things the host page did (for "Copy debug info")
+  const logHost = (did, msg) => {
+    const a = hostLog.get(did) || [];
+    a.push(`${new Date().toISOString().slice(11, 19)} ${String(msg).replace(/https?:\/\/[^\s"'<>)]+/g, (m) => '[' + (hostOf(m) || 'link') + ']').slice(0, 200)}`);
+    if (a.length > 40) a.shift();
+    hostLog.set(did, a);
+  };
+  const simpleOn = () => { try { return getSimpleHost ? getSimpleHost() !== false : true; } catch { return true; } };
+  const hostKeyOf = (u) => { const p = hostOf(u).split('.'); return p.length > 1 ? p[p.length - 2] : p[0]; };
   let resizeHooked = false;
 
   const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
@@ -747,6 +758,19 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
       hostSession = session.fromPartition(HOST_SESSION);
       hostSession.setPermissionRequestHandler((_wc, _permission, cb) => cb(false)); // no camera, location, notifications...
       hostSession.on('will-download', onHostDownload);
+      // For "Copy debug info": which requests the host page made and how they ended (host + path with long ids removed).
+      const shortUrl = (u) => {
+        try { const x = new URL(u); return x.hostname + x.pathname.replace(/[A-Za-z0-9_-]{16,}/g, '[id]').slice(0, 80); } catch { return '(bad address)'; }
+      };
+      const KINDS = new Set(['xhr', 'subFrame', 'mainFrame']);
+      hostSession.webRequest.onCompleted((det) => {
+        const did = hostJobs.get(det.webContentsId);
+        if (did && KINDS.has(det.resourceType)) logHost(did, `net ${det.method} ${det.statusCode} ${det.resourceType}: ${shortUrl(det.url)}`);
+      });
+      hostSession.webRequest.onErrorOccurred((det) => {
+        const did = hostJobs.get(det.webContentsId);
+        if (did && det.error !== 'net::ERR_ABORTED') logHost(did, `net FAILED ${det.error} ${det.resourceType}: ${shortUrl(det.url)}`);
+      });
     }
     return hostSession;
   }
@@ -801,6 +825,7 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
   }
 
   function destroyHostView(did) {
+    hostLog.delete(did);
     hideHostView(did);
     const view = hostViews.get(did);
     hostViews.delete(did);
@@ -838,6 +863,7 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
     // A pop-up from the same site is usually the next step of its own page, so follow it in this
     // panel. Pop-ups to other sites are almost always ads: refuse them (and say so).
     wc.setWindowOpenHandler(({ url }) => {
+      logHost(d.id, `pop-up ${isPublicWebUrl(url) && siteOf(url) === siteOf(wc.getURL()) ? 'followed' : 'refused'}: ${url}`);
       if (isPublicWebUrl(url) && siteOf(url) === siteOf(wc.getURL())) {
         setImmediate(() => { try { wc.loadURL(url).catch(() => {}); } catch {} });
       } else {
@@ -848,14 +874,54 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
     // Only ordinary web pages: never this computer or the home network, never other kinds of address.
     const guard = (e, url) => {
       if (url === 'about:blank') return;
-      if (!isPublicWebUrl(url)) { e.preventDefault(); note(`Blocked a jump to ${hostOf(url) || 'a non-web address'}.`); }
+      if (!isPublicWebUrl(url)) { logHost(d.id, `blocked jump: ${url}`); e.preventDefault(); note(`Blocked a jump to ${hostOf(url) || 'a non-web address'}.`); }
     };
     wc.on('will-navigate', guard);
     wc.on('will-redirect', guard);
-    wc.on('did-navigate', () => hostStatus(d, ''));
+    // Simple view: hide the host's page except the one Download button the person needs to press.
+    // The click itself is the person's own, so the host sees a normal visit.
+    // Only for FileKeeper pages. It runs as soon as the page's HTML exists (dom-ready), so the plain countdown screen
+    // is up while the host is still loading its own download links. Until then the view is dark, not white.
+    // It does NOT depend on the download's status, and it is started from several moments (page text ready, page loaded,
+    // in-page changes) plus a short repeat check after every navigation, because any single moment can be missed.
+    // The script ignores repeats, so extra tries are harmless.
+    let simpleLogged = 0;
+    const simpleNote = (msg) => { if (simpleLogged++ < 6) logHost(d.id, `simple view: ${msg}`); };
+    const inject = (why) => {
+      if (wc.isDestroyed()) return;
+      const url = wc.getURL();
+      if (!url || url === 'about:blank') return;
+      const isFk = hostKeyOf(url) === 'filekeeper';
+      const on = simpleOn() && isFk;
+      if (!on) { if (why === 'dom-ready') simpleNote(isFk ? 'turned off in settings' : 'not used (not a FileKeeper page)'); return; }
+      wc.executeJavaScript(spotlightScript('filekeeper', hostHint(url)), true)
+        .then(() => simpleNote(`started (${why})`))
+        .catch((err) => simpleNote(`could not start (${why}): ${String(err && err.message).slice(0, 80)}`));
+    };
+    let poll = null;
+    const startPoll = () => {
+      clearInterval(poll);
+      let n = 0;
+      poll = setInterval(() => {
+        if (wc.isDestroyed() || ++n > 30) { clearInterval(poll); return; }
+        inject('repeat check');
+      }, 500);
+    };
+    wc.on('did-start-navigation', (_e, _url, _inPlace, isMainFrame) => { if (isMainFrame) startPoll(); });
+    wc.on('dom-ready', () => inject('dom-ready'));
+    wc.on('did-finish-load', () => inject('page loaded'));
+    wc.on('did-stop-loading', () => inject('stopped loading'));
+    wc.on('did-navigate-in-page', () => inject('in-page change'));
+    startPoll();
+    wc.on('did-navigate', (_e, url) => { logHost(d.id, `went to: ${url}`); hostStatus(d, ''); });
+    wc.on('console-message', (...args) => {
+      const ev = args[0] && typeof args[0].message === 'string' ? args[0] : { level: args[1], message: args[2] };
+      if (ev.level === 'error' || ev.level === 3 || ev.level === 'warning' || ev.level === 2) logHost(d.id, `page console: ${String(ev.message).slice(0, 160)}`);
+    });
     wc.on('did-navigate-in-page', () => hostStatus(d, ''));
 
-    wc.on('did-fail-load', (_e, code, desc, _url, isMainFrame) => {
+    wc.on('did-fail-load', (_e, code, desc, failedUrl, isMainFrame) => {
+      logHost(d.id, `load failed (${isMainFrame ? 'page' : 'part'}) ${code} ${desc}: ${failedUrl}`);
       if (!isMainFrame || code === -3) return; // -3: a redirect cancelled the first load; not an error
       note(`The page did not load (${desc || 'no connection'}). Try another host above, or open it in your browser.`);
     });
@@ -987,6 +1053,19 @@ function init({ send, dataDir, getDownloadDir, setDownloadDir, allowPath, addGam
     } else {
       hideHostView(did);
     }
+    return true;
+  });
+
+  // "Copy debug info": what the host page looks like to the script and what it did, to the clipboard.
+  // Every web address is cut down to its host name first, so no download tokens leave the computer.
+  ipcMain.handle('downloads:hostDebug', async (_e, did) => {
+    const view = hostViews.get(did);
+    if (!view || view.webContents.isDestroyed()) return false;
+    let dom = '';
+    try { dom = String(await view.webContents.executeJavaScript('window.__zrDebug ? window.__zrDebug() : "(simple view script is not running on this page)"', true)); }
+    catch (e) { dom = `(could not read the page: ${e.message})`; }
+    const text = ['Zruxr host debug', `launcher page: ${hostOf(view.webContents.getURL())}`, dom, 'events:', ...(hostLog.get(did) || ['(none)'])].join('\n');
+    clipboard.writeText(text.slice(0, 12000));
     return true;
   });
 

@@ -250,6 +250,7 @@ function setTab(name) {
   pageGames.hidden = !onGames;
   pageStats.hidden = name !== 'stats';
   pageFriends.hidden = name !== 'friends';
+  if (name === 'friends') openFriendsTab();
   pageSettings.hidden = name !== 'settings';
   pageDownloads.hidden = name !== 'downloads';
   main.scrollTop = 0;
@@ -336,6 +337,7 @@ function renderGames(opts = {}) {
   libraryBlock.hidden = !hasGames;
   emptyFavs.hidden = !(isFav && hasGames && favs.length === 0);
   renderFeatured();
+  if (typeof renderFriendsPlaying === 'function') renderFriendsPlaying();
   updateDiscover();
   updateDownloads();
 
@@ -527,6 +529,8 @@ function renderSettings() {
   document.getElementById('optDiscover').checked = settings.showDiscover !== false;
   document.getElementById('optDownloads').checked = settings.showDownloads !== false;
 
+  document.getElementById('optTray').checked = settings.closeToTray !== false;
+  document.getElementById('optSimpleHost').checked = settings.simpleHost !== false;
   const startup = document.getElementById('optStartup');
   startup.checked = !!settings.startWithWindows;
   startup.disabled = !appInfo.packaged;
@@ -567,6 +571,8 @@ document.getElementById('sizeSeg').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-size]');
   if (b) saveSettings({ cardSize: b.dataset.size });
 });
+document.getElementById('optTray').addEventListener('change', (e) => saveSettings({ closeToTray: e.target.checked }));
+document.getElementById('optSimpleHost').addEventListener('change', (e) => saveSettings({ simpleHost: e.target.checked }));
 document.getElementById('optSplash').addEventListener('change', (e) => saveSettings({ startupAnimation: e.target.checked }));
 document.getElementById('optDownloads').addEventListener('change', (e) => saveSettings({ showDownloads: e.target.checked }).then(updateDownloads));
 document.getElementById('optDiscover').addEventListener('change', async (e) => {
@@ -733,10 +739,12 @@ function setAuthMode(mode) {
   hideAuthMsg();
 }
 
-// Signed out when Zruxr opens: offer to create an account. It's optional, so "Not now"
-// (or signing in) just closes it and the app carries on. Comes back next launch.
+// First launch after installing only: offer to create an account. It's optional, so "Not now"
+// (or signing in) just closes it, and it never comes back by itself. Sign in later from Settings.
 function showWelcome() {
-  if (account.email || locked) return;
+  if (account.email || locked || settings.welcomeSeen !== false) return;
+  settings.welcomeSeen = true;
+  window.launcher.setSettings({ welcomeSeen: true }).catch(() => {});
   locked = true;
   accountPop.classList.add('locked');
   authPass.value = '';
@@ -755,7 +763,9 @@ function closeWelcome() {
 }
 document.getElementById('authSkip').addEventListener('click', closeWelcome);
 
+let friendsEmail;
 function renderAccount() {
+  if (friendsEmail !== account.email) { friendsEmail = account.email; friendsData = null; if (typeof loadFriends === 'function' && tab === 'friends') loadFriends(); else if (!account.email) setFriendsBadge(0); else if (typeof refreshFriendsQuiet === 'function') refreshFriendsQuiet(); }
   if (booted && account.email && locked) closeWelcome(); // signed in from the welcome screen
   const signed = !!account.email;
   authView.hidden = signed;
@@ -1268,6 +1278,8 @@ function setStep(text, percent) {
   span.textContent = text;
   splashStatus.replaceChildren(span);
   splashFill.style.width = percent + '%';
+  const pct = document.getElementById('splashPct');
+  if (pct) pct.textContent = Math.round(percent) + '%';
 }
 
 // Update check hook. There is no updater wired up yet, so this just resolves
@@ -1363,6 +1375,7 @@ let sourceItems = [];
 let downloadList = [];
 let dlQuery = '';
 let dlSource = 'all'; // 'all' or a source id
+let dlSect = 'all'; // 'all' or a section id (Big titles, Co-op...)
 let dlLimit = 24;
 let dlGridKey = '';
 const coverMemo = new Map(); // item title -> { file, tint } | null
@@ -1436,8 +1449,47 @@ function updateDownloads() {
   document.getElementById('dlSub').textContent =
     `${sourceItems.length} game${sourceItems.length === 1 ? '' : 's'} from ${sourceList.length} source${sourceList.length === 1 ? '' : 's'}`;
   renderDlTabs();
+  renderDlSections();
   renderDlActive();
   renderDlGrid();
+}
+
+// Clickable sections, like a store front: Big titles, Co-op, Horror... Only sections that have games show.
+const SECTION_INFO = [
+  ['big', 'Big titles', 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.5 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z'],
+  ['coop', 'Co-op & multiplayer', 'M8 11a3 3 0 100-6 3 3 0 000 6zm8 0a3 3 0 100-6 3 3 0 000 6zM3 19c0-3 2.5-5 5-5s5 2 5 5M11 19c0-3 2.5-5 5-5s5 2 5 5'],
+  ['new', 'New', 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18'],
+  ['openworld', 'Open world', 'M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9S14.5 18.3 12 21c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z'],
+  ['shooter', 'Shooters', 'M12 21a9 9 0 100-18 9 9 0 000 18zM12 3v4M12 17v4M3 12h4M17 12h4'],
+  ['rpg', 'RPG', 'M14.5 4.5l5 5L9 20l-5 1 1-5zM13 6l5 5'],
+  ['horror', 'Horror', 'M6 20V10a6 6 0 1112 0v10l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5zM9.5 11h.01M14.5 11h.01'],
+  ['racing', 'Racing & sports', 'M5 21V4h2M7 5h12l-2.5 4L19 13H7'],
+  ['survival', 'Survival & building', 'M4 20l8-16 8 16zM9 20v-5h6v5'],
+  ['indie', 'Small & indie', 'M12 21s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 11c0 5.6-7 10-7 10z'],
+];
+function renderDlSections() {
+  const box = document.getElementById('dlSections');
+  const base = sourceItems.filter((i) => looksLikeGame(i) && (dlSource === 'all' || i.sourceId === dlSource));
+  const counts = {};
+  for (const i of base) for (const s of i.sections || []) counts[s] = (counts[s] || 0) + 1;
+  const shown = SECTION_INFO.filter(([id]) => counts[id]);
+  if (dlSect !== 'all' && !counts[dlSect]) dlSect = 'all';
+  box.hidden = shown.length === 0;
+  box.replaceChildren();
+  if (!shown.length) return;
+  const tile = (id, label, count, path) => {
+    const b = make('button', 'sect' + (dlSect === id ? ' on' : ''));
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(dlSect === id));
+    b.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${path}"/></svg>`;
+    const t = make('span', 'sect-text');
+    t.append(make('span', 'sect-name', label), make('span', 'sect-count', `${count} game${count === 1 ? '' : 's'}`));
+    b.append(t);
+    b.addEventListener('click', () => { dlSect = dlSect === id && id !== 'all' ? 'all' : id; dlLimit = 24; dlGridKey = ''; updateDownloads(); });
+    box.append(b);
+  };
+  tile('all', 'All games', base.length, 'M4 5h7v7H4zM13 5h7v7h-7zM4 14h7v6H4zM13 14h7v6h-7z');
+  for (const [id, label, path] of shown) tile(id, label, counts[id], path);
 }
 
 function renderDlTabs() {
@@ -1507,7 +1559,7 @@ function speedGraph(d) {
   for (const y of [H * 0.25, H * 0.5, H * 0.75]) {
     const l = document.createElementNS(SVG_NS, 'line');
     l.setAttribute('x1', 0); l.setAttribute('x2', W); l.setAttribute('y1', y); l.setAttribute('y2', y);
-    l.setAttribute('class', 'dl-grid');
+    l.setAttribute('class', 'dl-gridline');
     svg.append(l);
   }
   if (data.length >= 2) {
@@ -1676,7 +1728,7 @@ function looksLikeGame(i) {
 function filteredItems() {
   const q = dlQuery.trim().toLowerCase();
   const list = sourceItems.filter(
-    (i) => looksLikeGame(i) && (dlSource === 'all' || i.sourceId === dlSource) && (!q || i.title.toLowerCase().includes(q))
+    (i) => looksLikeGame(i) && (dlSource === 'all' || i.sourceId === dlSource) && (dlSect === 'all' || (i.sections || []).includes(dlSect)) && (!q || i.title.toLowerCase().includes(q))
   );
   return sortItems(list);
 }
@@ -1807,6 +1859,11 @@ window.launcher.onHostClose((p) => {
   hostPanelId = null;
 });
 document.getElementById('hostClose').addEventListener('click', () => hostPanelId && window.launcher.hostClose(hostPanelId));
+document.getElementById('hostDebug').addEventListener('click', async () => {
+  if (!hostPanelId) return;
+  const ok = await window.launcher.hostDebug(hostPanelId);
+  showToast(ok ? 'Copied. Paste it into your message.' : "Couldn't read the page.", ok ? 'info' : 'error');
+});
 document.getElementById('hostBrowser').addEventListener('click', () => hostPanelId && window.launcher.hostBrowser(hostPanelId));
 document.getElementById('hostAdopt').addEventListener('click', async () => {
   if (!hostPanelId) return;
@@ -1956,6 +2013,134 @@ function fakeDownloads(title) {
   return `${t} downloads`;
 }
 
+// Little tags read from the title: version, build, DLC and so on. Real text from the source, nothing made up.
+function titleTags(title) {
+  const t = String(title);
+  const out = [];
+  const v = /\bv\.?\s?(\d+(?:\.\d+){0,3})\b/i.exec(t);
+  if (v) out.push(`Version ${v[1]}`);
+  const bld = /\bbuild\.?\s?(\d{3,})\b/i.exec(t);
+  if (bld) out.push(`Build ${bld[1]}`);
+  if (/\b(dlcs?|expansions?)\b/i.test(t)) out.push('Includes DLC');
+  if (/\bmulti-?\d*\b/i.test(t)) out.push('Multi-language');
+  if (/\brepack\b/i.test(t)) out.push('Repack');
+  if (/\b(update|patch|hotfix)\b/i.test(t)) out.push('Update');
+  if (/\b(soundtrack|ost)\b/i.test(t)) out.push('Soundtrack');
+  return out.slice(0, 4);
+}
+
+// ----- Hover panel: a floating card beside the game with what it is and the facts we have -----
+const dlPop = make('div', 'dl-pop');
+dlPop.setAttribute('aria-hidden', 'true');
+document.body.append(dlPop);
+let popTimer = null;
+let popFor = null;
+
+function popFacts(it) {
+  const rows = [];
+  if (it.size) rows.push(['Size', it.size]);
+  if (it.sourceName) rows.push(['Source', it.sourceName]);
+  const hostNames = [...new Set((it.hosts || []).map((h) => h.label).filter(Boolean))];
+  if (hostNames.length) rows.push(['Hosts', hostNames.slice(0, 3).join(', ') + (hostNames.length > 3 ? ` +${hostNames.length - 3}` : '')]);
+  else if (it.via) rows.push(['Download', it.via === 'direct' ? 'Direct (automatic)' : 'Host page']);
+  const alts = Array.isArray(it.alts) ? it.alts.length : 0;
+  if (alts) rows.push(['Backups', `${alts} other link${alts === 1 ? '' : 's'}`]);
+  const when = it.date ? Date.parse(it.date) : NaN;
+  if (when) rows.push(['Added', ago(new Date(when).toISOString())]);
+  if (games.some((g) => g.name.toLowerCase() === String(it.title).toLowerCase() && !g.uninstalled)) rows.push(['Status', 'In your library']);
+  const dl = make('dl', 'dl-info-list');
+  for (const [k, v] of rows) dl.append(make('dt', '', k), make('dd', '', v));
+  return dl;
+}
+
+function fillPop(it, info) {
+  const box = dlPop.querySelector('.dl-pop-about');
+  if (!box) return;
+  box.replaceChildren();
+  if (!info || info.miss) {
+    const why = info && info.miss === 'network'
+      ? `Couldn't reach Steam${info.detail ? ' (' + info.detail + ')' : ''}.`
+      : info && info.tried && info.tried.length ? `No Steam match for "${info.tried[0]}".` : 'No description found for this one.';
+    box.append(make('p', 'dl-pop-desc dim', why));
+    return;
+  }
+  const pics = make('div', 'dl-pop-pics');
+  for (const f of (info.shots || []).slice(0, 3)) {
+    const im = make('img');
+    im.src = `cover://shots/${encodeURIComponent(f)}`;
+    im.alt = '';
+    im.draggable = false;
+    im.addEventListener('load', () => placePop(popFor || document.body));
+    pics.append(im);
+  }
+  if (info.header) {
+    const hd = make('img', 'dl-pop-banner');
+    hd.src = `cover://shots/${encodeURIComponent(info.header)}`;
+    hd.alt = '';
+    hd.draggable = false;
+    dlPop.prepend(hd);
+  }
+  box.append(make('p', 'dl-pop-desc', info.desc));
+  const chips = [...info.genres, ...info.modes];
+  if (chips.length) {
+    const row = make('div', 'dl-info-tags');
+    for (const c of chips) row.append(make('span', 'dl-tag', c));
+    box.append(row);
+  }
+  const bits = [info.developer, info.release, info.metacritic ? `Metacritic ${info.metacritic}` : ''].filter(Boolean);
+  if (bits.length) box.append(make('div', 'dl-pop-meta', bits.join(' · ')));
+  if (pics.children.length) box.append(pics);
+}
+
+function placePop(card) {
+  if (!card || !card.getBoundingClientRect || card === document.body) return;
+  const r = card.getBoundingClientRect();
+  const w = dlPop.offsetWidth, h = dlPop.offsetHeight, gap = 14;
+  const right = r.right + gap + w <= window.innerWidth - 12;
+  const left = right ? r.right + gap : Math.max(12, r.left - gap - w);
+  const top = Math.min(Math.max(72, r.top), Math.max(72, window.innerHeight - h - 12));
+  dlPop.style.left = `${left}px`;
+  dlPop.style.top = `${top}px`;
+  dlPop.classList.toggle('flip', !right);
+  dlPop.style.setProperty('--arrow-y', `${Math.min(Math.max(24, r.top + 60 - top), Math.max(24, h - 30))}px`);
+}
+
+function schedulePop(card, it) {
+  clearTimeout(popTimer);
+  if (popFor === card) return;
+  popTimer = setTimeout(async () => {
+    popFor = card;
+    dlPop.replaceChildren();
+    dlPop.append(make('div', 'dl-info-title', it.title));
+    const tags = titleTags(it.title);
+    if (tags.length) {
+      const row = make('div', 'dl-info-tags');
+      for (const t of tags) row.append(make('span', 'dl-tag', t));
+      dlPop.append(row);
+    }
+    const about = make('div', 'dl-pop-about');
+    about.append(make('div', 'dl-skel'), make('div', 'dl-skel short'));
+    dlPop.append(about, popFacts(it));
+    const labels = (it.sections || []).map((id) => (SECTION_INFO.find((x) => x[0] === id) || [])[1]).filter(Boolean);
+    if (labels.length) dlPop.append(make('div', 'dl-info-cats', labels.join(' · ')));
+    dlPop.classList.add('on');
+    placePop(card);
+    let info = null;
+    try { info = await window.launcher.gameInfo(it.title); } catch { info = null; }
+    if (popFor !== card) return; // moved to another game meanwhile
+    fillPop(it, info);
+    placePop(card);
+  }, 380);
+}
+
+function hidePop() {
+  clearTimeout(popTimer);
+  popFor = null;
+  dlPop.classList.remove('on');
+}
+document.querySelector('main').addEventListener('scroll', hidePop, { passive: true });
+window.addEventListener('blur', hidePop);
+
 function renderDlGrid() {
   const all = filteredItems();
   const shown = all.slice(0, dlLimit);
@@ -1988,13 +2173,24 @@ function renderDlGrid() {
     if (known && known.file) { paintPlaceholder(cover, g); applyCover(cover, article, known); }
     else { paintPlaceholder(cover, g); coverObserver.observe(cover); }
     article.append(cover);
+    const badges = (it.sections || []).filter((s) => s === 'coop' || s === 'new');
+    if (badges.length) {
+      const bar = make('div', 'dl-badges');
+      for (const s of badges) bar.append(make('span', 'dl-badge ' + s, s === 'coop' ? 'Co-op' : 'New'));
+      cover.append(bar);
+    }
 
     const name = make('div', 'game-name', it.title);
     name.title = it.title;
     const meta = make('div', 'game-meta', [it.size, it.sourceName].filter(Boolean).join(' · ') || ' ');
     article.append(name, meta, bigButton(it));
+    article.addEventListener('mouseenter', () => schedulePop(article, it));
+    article.addEventListener('mouseleave', hidePop);
+    article.addEventListener('focusin', () => schedulePop(article, it));
+    article.addEventListener('focusout', hidePop);
     dlGridEl.append(article);
   });
+  hidePop();
 }
 
 window.launcher.onSourcesChanged(() => loadSourcesData()); // sources were re-read in the background
@@ -2176,3 +2372,411 @@ document.getElementById('updateLater').addEventListener('click', () => {
   updateBar.hidden = true;
 });
 
+
+
+// ---------- Friends ----------
+let friendsData = null; // { me, friends, incoming, outgoing }
+let friendsTimer = null;
+const friendsEl = {
+  signedOut: document.getElementById('friendsSignedOut'),
+  setup: document.getElementById('friendsSetup'),
+  main: document.getElementById('friendsMain'),
+  sub: document.getElementById('friendsSub'),
+  list: document.getElementById('friendList'),
+  reqs: document.getElementById('friendReqs'),
+  empty: document.getElementById('friendsEmpty'),
+  head: document.getElementById('friendsHead'),
+  msg: document.getElementById('friendMsg'),
+  count: document.getElementById('friendsCount'),
+};
+
+function ago(iso) {
+  const t = Date.parse(iso);
+  if (!t) return '';
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 90) return 'just now';
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  if (s < 86400 * 30) return `${Math.round(s / 86400)} d ago`;
+  return new Date(t).toLocaleDateString();
+}
+const friendHours = (sec) => (sec >= 3600 ? `${(sec / 3600).toFixed(sec >= 36000 ? 0 : 1)} h played` : sec >= 60 ? `${Math.round(sec / 60)} min played` : '');
+
+function friendsMsg(text, ok = false) {
+  friendsEl.msg.hidden = !text;
+  friendsEl.msg.textContent = text || '';
+  friendsEl.msg.classList.toggle('ok', ok);
+}
+
+// Pulls the latest lists. Shows sign-in or "not set up" instead when that's the situation.
+async function loadFriends() {
+  if (!account.email) {
+    friendsData = null;
+    friendsEl.signedOut.hidden = false; friendsEl.setup.hidden = true; friendsEl.main.hidden = true;
+    friendsEl.sub.textContent = 'See what your friends are playing';
+    setFriendsBadge(0);
+    return;
+  }
+  const res = await window.launcher.friendsOverview();
+  if (!res.ok) {
+    friendsEl.signedOut.hidden = res.code !== 'signed_out';
+    friendsEl.setup.hidden = res.code !== 'not_set_up';
+    friendsEl.main.hidden = true;
+    if (res.code !== 'not_set_up' && res.code !== 'signed_out') { friendsEl.main.hidden = !friendsData; friendsMsg(res.error); }
+    return;
+  }
+  friendsData = res.data;
+  friendsEl.signedOut.hidden = true; friendsEl.setup.hidden = true; friendsEl.main.hidden = false;
+  renderFriends();
+}
+
+function setFriendsBadge(n) {
+  friendsEl.count.textContent = String(n);
+  friendsEl.count.hidden = n === 0;
+}
+
+const AVATAR_COLORS = ['#6d8cff', '#a78bfa', '#f472b6', '#f87171', '#fb923c', '#facc15', '#4ade80', '#2dd4bf'];
+function paintFriendAv(el, name, color) {
+  el.textContent = (name[0] || '?').toUpperCase();
+  if (color && /^#[0-9a-fA-F]{6}$/.test(color)) { el.style.background = `${color}33`; el.style.borderColor = color; }
+  else { el.style.background = ''; el.style.borderColor = ''; }
+}
+const ownsGame = (name) => games.find((g) => g.name.toLowerCase() === String(name).toLowerCase());
+const runningGame = () => games.find((g) => g.running);
+
+function friendRow(f) {
+  const row = make('div', 'friend');
+  const av = make('div', 'friend-av');
+  paintFriendAv(av, f.username, f.avatar_color);
+  const info = make('div', 'friend-info');
+  const nameBtn = make('button', 'friend-name link-name', f.username);
+  nameBtn.type = 'button';
+  nameBtn.title = 'View profile';
+  nameBtn.addEventListener('click', () => openProfile(f));
+  info.append(nameBtn);
+  let status;
+  if (f.playing) status = make('div', 'friend-status playing', `Playing ${f.playing}`);
+  else if (f.last_game) status = make('div', 'friend-status', `Last played ${f.last_game}${f.last_played ? ' · ' + ago(f.last_played) : ''}`);
+  else status = make('div', 'friend-status', 'Activity hidden or nothing played yet');
+  info.append(status);
+  if (f.total_seconds) info.append(make('div', 'friend-hours', friendHours(f.total_seconds)));
+  if (f.playing) av.classList.add('on');
+  else if (f.status === 'busy') av.classList.add('busy');
+  const acts = make('div', 'row-actions');
+  acts.append(
+    miniBtn('Invite', async () => {
+      const g = runningGame();
+      if (!g) return openProfile(f, true); // not playing anything: pick a game first
+      inviteFriend(f, g.name);
+    }),
+    miniBtn('Profile', () => openProfile(f)),
+    miniBtn('Block', async () => {
+      if (!confirm(`Block ${f.username}?\n\nThey are removed from your friends and can't find or add you.`)) return;
+      const r = await window.launcher.friendsBlock(f.id);
+      if (!r.ok) return showToast(r.error);
+      loadFriends();
+    }),
+    miniBtn('Remove', async () => {
+      if (!confirm(`Remove ${f.username} from your friends?`)) return;
+      const r = await window.launcher.friendsRemove(f.id);
+      if (!r.ok) return showToast(r.error);
+      loadFriends();
+    })
+  );
+  row.append(av, info, acts);
+  return row;
+}
+
+async function inviteFriend(f, gameName) {
+  const r = await window.launcher.friendsInvite(f.id, gameName);
+  if (!r.ok) return showToast(r.error);
+  const msg = { sent: `Invited ${f.username} to ${gameName}.`, rate_limited: 'Too many invites. Try again later.', not_friends: "Couldn't send that invite." }[r.data] || 'Done.';
+  showToast(msg, r.data === 'sent' ? 'info' : 'error');
+}
+
+function reqRow(r, text, acts) {
+  const row = make('div', 'friend');
+  const av = make('div', 'friend-av');
+  paintFriendAv(av, r.username || r.from || '?');
+  const info = make('div', 'friend-info');
+  info.append(make('div', 'friend-name', r.username || r.from), make('div', 'friend-status', text));
+  const a = make('div', 'row-actions');
+  a.append(...acts);
+  row.append(av, info, a);
+  return row;
+}
+
+function renderFriends() {
+  const d = friendsData;
+  const inc = d.incoming || [], outg = d.outgoing || [], inv = d.invites || [], blk = d.blocked || [];
+  friendsEl.sub.textContent = `Signed in as ${d.me.username}`;
+  const playing = d.friends.filter((f) => f.playing).length;
+  friendsEl.head.textContent = d.friends.length ? `Friends · ${d.friends.length}${playing ? ` · ${playing} playing now` : ''}` : 'Friends';
+  friendsEl.empty.hidden = d.friends.length > 0;
+  // Playing now first, then the rest by name (the server already sorts by name).
+  const sorted = [...d.friends].sort((a, b) => (b.playing ? 1 : 0) - (a.playing ? 1 : 0));
+  friendsEl.list.replaceChildren(...sorted.map(friendRow));
+
+  // me card: colour + status
+  const st = d.me.status || 'online';
+  paintFriendAv(document.getElementById('meAv'), d.me.username, d.me.avatar_color);
+  document.getElementById('meName').textContent = d.me.username;
+  document.querySelectorAll('#statusSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.status === st)));
+  document.querySelectorAll('#colorRow .color-dot').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.color === d.me.avatar_color)));
+
+  // invites
+  const invEl = document.getElementById('friendInvites');
+  invEl.replaceChildren();
+  invEl.hidden = !inv.length;
+  if (inv.length) {
+    invEl.append(make('h3', 'friend-h', `Game invites · ${inv.length}`));
+    for (const i of inv) {
+      const mine = ownsGame(i.game);
+      const acts = [];
+      if (mine && !mine.running) acts.push(miniBtn('Play', async () => { handleLaunchResult(await window.launcher.launch(mine.id)); }, true));
+      acts.push(miniBtn('Dismiss', async () => { await window.launcher.friendsDismissInvite(i.id); loadFriends(); }));
+      invEl.append(reqRow(i, `invited you to ${i.game}${mine ? ' · you have it' : ''} · ${ago(i.at)}`, acts));
+    }
+  }
+
+  friendsEl.reqs.replaceChildren();
+  friendsEl.reqs.hidden = !(inc.length || outg.length);
+  if (!friendsEl.reqs.hidden) {
+    friendsEl.reqs.append(make('h3', 'friend-h', `Requests · ${inc.length + outg.length}`));
+    for (const r of inc) {
+      friendsEl.reqs.append(reqRow(r, 'wants to be your friend', [
+        miniBtn('Accept', async () => { const x = await window.launcher.friendsRespond(r.id, true); x.ok ? loadFriends() : showToast(x.error); }, true),
+        miniBtn('Decline', async () => { const x = await window.launcher.friendsRespond(r.id, false); x.ok ? loadFriends() : showToast(x.error); }),
+        miniBtn('Block', async () => { const x = await window.launcher.friendsBlock(r.id); x.ok ? loadFriends() : showToast(x.error); }),
+      ]));
+    }
+    for (const r of outg) {
+      friendsEl.reqs.append(reqRow(r, 'request sent, waiting for them', [
+        miniBtn('Cancel', async () => { const x = await window.launcher.friendsRemove(r.id); x.ok ? loadFriends() : showToast(x.error); }),
+      ]));
+    }
+  }
+
+  const blkEl = document.getElementById('friendBlocked');
+  blkEl.replaceChildren();
+  blkEl.hidden = !blk.length;
+  if (blk.length) {
+    blkEl.append(make('h3', 'friend-h', `Blocked · ${blk.length}`));
+    for (const b of blk) {
+      blkEl.append(reqRow(b, "can't see or add you", [
+        miniBtn('Unblock', async () => { const x = await window.launcher.friendsUnblock(b.user_id); x.ok ? loadFriends() : showToast(x.error); }),
+      ]));
+    }
+  }
+
+  setFriendsBadge(inc.length + inv.length);
+  document.getElementById('optShowActivity').checked = d.me.show_activity !== false;
+  document.getElementById('optAllowReq').checked = d.me.allow_requests !== false;
+  document.getElementById('optNotify').checked = settings.notifyFriends !== false;
+  renderFriendsPlaying();
+}
+
+// ----- status + colour -----
+const colorRow = document.getElementById('colorRow');
+for (const c of AVATAR_COLORS) {
+  const b = make('button', 'color-dot');
+  b.type = 'button';
+  b.dataset.color = c;
+  b.style.background = c;
+  b.setAttribute('aria-label', `Colour ${c}`);
+  b.setAttribute('aria-pressed', 'false');
+  colorRow.append(b);
+}
+async function saveMe(patch) {
+  const r = await window.launcher.friendsStatus(patch);
+  if (!r.ok) showToast(r.code === 'not_set_up' ? 'Run docs/friends-setup-2.sql on the server first.' : r.error);
+  loadFriends();
+}
+document.getElementById('statusSeg').addEventListener('click', (e) => { const b = e.target.closest('button[data-status]'); if (b) saveMe({ status: b.dataset.status }); });
+colorRow.addEventListener('click', (e) => { const b = e.target.closest('.color-dot'); if (b) saveMe({ color: b.dataset.color }); });
+document.getElementById('optNotify').addEventListener('change', (e) => saveSettings({ notifyFriends: e.target.checked }));
+
+// ----- "Friends are playing" row on the Library page -----
+function renderFriendsPlaying() {
+  const box = document.getElementById('friendsPlaying');
+  const list = ((friendsData && friendsData.friends) || []).filter((f) => f.playing);
+  box.hidden = !(tab === 'library' && list.length);
+  if (box.hidden) return;
+  document.getElementById('fpRow').replaceChildren(...list.map((f) => {
+    const chip = make('button', 'fp-chip');
+    chip.type = 'button';
+    const av = make('div', 'friend-av');
+    paintFriendAv(av, f.username, f.avatar_color);
+    const t = make('div');
+    const own = ownsGame(f.playing);
+    t.append(make('b', '', f.username));
+    const sm = make('small', '', f.playing);
+    if (own) { const o = make('span', 'own', ' · you have it'); sm.append(o); }
+    t.append(sm);
+    chip.append(av, t);
+    chip.addEventListener('click', () => setTab('friends'));
+    return chip;
+  }));
+}
+
+// ----- profile card + compare games -----
+const profileDialog = document.getElementById('profileDialog');
+document.getElementById('profileClose').addEventListener('click', () => profileDialog.close());
+let profileFriend = null;
+const hrs = (s) => (s >= 3600 ? `${(s / 3600).toFixed(s >= 36000 ? 0 : 1)} h` : s >= 60 ? `${Math.round(s / 60)} min` : '0 h');
+
+async function openProfile(f, focusInvite = false) {
+  profileFriend = f;
+  paintFriendAv(document.getElementById('profAv'), f.username, f.avatar_color);
+  document.getElementById('profName').textContent = f.username;
+  document.getElementById('profSub').textContent = '';
+  document.getElementById('profBody').hidden = true;
+  document.getElementById('profHidden').hidden = true;
+  const sel = document.getElementById('profGame');
+  sel.replaceChildren(...games.map((g) => { const o = make('option', '', g.name); o.value = g.name; return o; }));
+  const run = runningGame();
+  if (run) sel.value = run.name;
+  document.getElementById('profInvite').disabled = !games.length;
+  if (!profileDialog.open) profileDialog.showModal();
+  if (focusInvite) sel.focus();
+
+  const r = await window.launcher.friendsProfile(f.id);
+  if (!profileDialog.open || profileFriend !== f) return;
+  if (!r.ok || !r.data) {
+    document.getElementById('profSub').textContent = r.code === 'not_set_up' ? 'Run docs/friends-setup-2.sql on the server to see profiles.' : (r.error || "Couldn't load this profile.");
+    return;
+  }
+  const p = r.data;
+  paintFriendAv(document.getElementById('profAv'), p.username, p.avatar_color);
+  document.getElementById('profSub').textContent = `Friends since ${new Date(p.since).toLocaleDateString()}${p.total_seconds ? ' · ' + hrs(p.total_seconds) + ' played in total' : ''}`;
+  if (!p.shared) { document.getElementById('profHidden').hidden = false; return; }
+  document.getElementById('profBody').hidden = false;
+  const theirs = (p.library || []).filter((x) => x && x.n);
+  const top = [...theirs].sort((a, b) => b.s - a.s).filter((x) => x.s > 0).slice(0, 3);
+  const topEl = document.getElementById('profTop');
+  topEl.replaceChildren(...(top.length ? top.map((x) => { const li = make('li'); li.append(make('span', '', x.n), make('span', '', hrs(x.s))); return li; }) : [make('li', '', 'Nothing played yet')]));
+  const mine = new Map(games.map((g) => [g.name.toLowerCase(), g]));
+  const both = theirs.filter((x) => mine.has(x.n.toLowerCase())).map((x) => ({ name: x.n, you: mine.get(x.n.toLowerCase()).playTimeSeconds || 0, them: x.s })).sort((a, b) => (b.you + b.them) - (a.you + a.them));
+  document.getElementById('profCompareSum').textContent = both.length
+    ? `You both have ${both.length} game${both.length === 1 ? '' : 's'}.`
+    : "You don't share any games yet.";
+  const rows = [Object.assign(make('div', 'cmp-row head'), {})];
+  rows[0].append(make('span', '', 'Game'), make('span', '', 'You'), make('span', '', p.username.slice(0, 8)));
+  for (const g of both) {
+    const row = make('div', 'cmp-row');
+    const y = make('span', g.you > g.them ? 'more' : '', hrs(g.you));
+    const t = make('span', g.them > g.you ? 'more' : '', hrs(g.them));
+    row.append(make('span', '', g.name), y, t);
+    rows.push(row);
+  }
+  document.getElementById('profCompare').replaceChildren(...(both.length ? rows : []));
+}
+document.getElementById('profInvite').addEventListener('click', async () => {
+  const name = document.getElementById('profGame').value;
+  if (profileFriend && name) { await inviteFriend(profileFriend, name); }
+});
+
+// ----- Game won't start: checks -----
+const diagDialog = document.getElementById('diagDialog');
+document.getElementById('diagClose').addEventListener('click', () => diagDialog.close());
+function openDiag(id) {
+  const withPath = games.filter((g) => g.path || true);
+  if (!withPath.length) return showToast('Add a game first.', 'info');
+  document.getElementById('diagGame').replaceChildren(...withPath.map((g) => { const o = make('option', '', g.name); o.value = g.id; return o; }));
+  if (id) document.getElementById('diagGame').value = id;
+  document.getElementById('diagList').replaceChildren();
+  if (!diagDialog.open) diagDialog.showModal();
+  if (id) runDiag();
+}
+async function runDiag() {
+  const id = document.getElementById('diagGame').value;
+  const btn = document.getElementById('diagRun');
+  const list = document.getElementById('diagList');
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  list.replaceChildren(make('li', 'diag-item', 'Checking…'));
+  const res = await window.launcher.diagnoseGame(id);
+  btn.disabled = false;
+  btn.textContent = 'Check again';
+  if (!res.ok) return list.replaceChildren(make('li', 'diag-item bad', res.error || "Couldn't check that game."));
+  list.replaceChildren(...res.checks.map((c) => {
+    const li = make('li', `diag-item ${c.level}`);
+    li.append(make('span', 'diag-dot'));
+    const box = make('div');
+    box.append(make('strong', '', c.title));
+    if (c.fix) box.append(make('p', '', c.fix));
+    if (c.action === 'security') box.append(miniBtn('Open Windows Security', () => window.launcher.openSecurity()));
+    else if (c.action === 'vcredist') box.append(miniBtn('Get Visual C++', () => window.launcher.diagLink('vcredist'), true));
+    else if (c.action === 'directx') box.append(miniBtn('Get DirectX', () => window.launcher.diagLink('directx'), true));
+    li.append(box);
+    return li;
+  }));
+  if (res.checks.every((c) => c.level === 'ok' || c.level === 'info')) {
+    list.append(Object.assign(make('li', 'diag-item', 'Nothing obvious is wrong. If it still fails, try a different .exe (Edit) or reinstall the game.')));
+  }
+}
+document.getElementById('diagRun').addEventListener('click', runDiag);
+document.getElementById('diagGame').addEventListener('change', () => document.getElementById('diagList').replaceChildren());
+document.getElementById('libCheck').addEventListener('click', () => openDiag(null));
+document.getElementById('launchHelpCheck').addEventListener('click', () => { launchHelp.hidden = true; openDiag(launchHelpId); });
+
+// ----- live updates from the main process (polls every minute) -----
+window.launcher.onFriendsUpdate((d) => {
+  friendsData = d;
+  setFriendsBadge(((d.incoming || []).length) + ((d.invites || []).length));
+  if (tab === 'friends') renderFriends(); else renderFriendsPlaying();
+});
+window.launcher.onOpenTab((t) => { if (t === 'friends') setTab('friends'); });
+async function refreshFriendsQuiet() {
+  if (!account.email) return;
+  const res = await window.launcher.friendsOverview();
+  if (res.ok) {
+    friendsData = res.data;
+    setFriendsBadge(((res.data.incoming || []).length) + ((res.data.invites || []).length));
+    renderFriendsPlaying();
+  }
+}
+
+function openFriendsTab() {
+  friendsMsg('');
+  loadFriends();
+  clearInterval(friendsTimer);
+  friendsTimer = setInterval(() => { if (tab !== 'friends' || document.hidden) return; loadFriends(); }, 30000);
+}
+
+const FRIEND_ADD_TEXT = {
+  sent: ['Request sent.', true],
+  accepted: ['You are now friends!', true],
+  already_friends: ['You are already friends.', false],
+  already_sent: ['You already sent them a request.', false],
+  self: ["That's you.", false],
+  not_found: ["Couldn't find that username, or they aren't taking requests.", false],
+  rate_limited: ['Too many requests. Try again later.', false],
+  you_blocked: ['You blocked that person. Unblock them below first.', false],
+};
+document.getElementById('friendAddForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const input = document.getElementById('friendUser');
+  const name = input.value.trim();
+  if (!name) return friendsMsg('Type their username first.');
+  const btn = document.getElementById('friendAddBtn');
+  btn.disabled = true;
+  const res = await window.launcher.friendsAdd(name);
+  btn.disabled = false;
+  if (!res.ok) return friendsMsg(res.error);
+  const [text, ok] = FRIEND_ADD_TEXT[res.data] || ['Done.', true];
+  friendsMsg(text, ok);
+  if (ok) input.value = '';
+  loadFriends();
+});
+
+async function savePrivacy() {
+  const res = await window.launcher.friendsPrivacy({
+    showActivity: document.getElementById('optShowActivity').checked,
+    allowRequests: document.getElementById('optAllowReq').checked,
+  });
+  if (!res.ok) { showToast(res.error); loadFriends(); }
+}
+document.getElementById('optShowActivity').addEventListener('change', savePrivacy);
+document.getElementById('optAllowReq').addEventListener('change', savePrivacy);
+document.getElementById('friendsSignIn').addEventListener('click', () => setAccountOpen(true));

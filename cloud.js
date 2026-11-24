@@ -88,6 +88,7 @@ function friendly(data, status) {
   if (/email rate limit/i.test(text)) {
     return 'Supabase has hit its sign-up email limit (about 2 per hour on the free email service). Wait an hour, or turn off "Confirm email" in your Supabase Auth settings.';
   }
+  if (/could not find the function|PGRST202/i.test(text)) return 'FRIENDS_NOT_SET_UP';
   if (/rate limit|too many/i.test(text)) return 'Too many attempts. Wait a minute and try again.';
   return text;
 }
@@ -279,4 +280,28 @@ async function deleteGame(name) {
   await http('DELETE', `/rest/v1/games?local_id=eq.${encodeURIComponent(syncKey(name))}`, { token });
 }
 
-module.exports = { init, email, isSignedIn, signUp, signIn, signOut, sync, deleteGame };
+// ---------- Friends ----------
+// All of it goes through database functions (see docs/friends-setup.sql). The tables themselves are locked.
+async function rpc(name, args) {
+  const token = await getToken();
+  return http('POST', `/rest/v1/rpc/${name}`, { token, body: args || {} });
+}
+const friends = {
+  overview: () => rpc('friends_overview'),
+  add: (username) => rpc('friends_send_request', { target: username }),
+  respond: (id, accept) => rpc('friends_respond', { request_id: id, accept: !!accept }),
+  remove: (id) => rpc('friends_remove', { friendship_id: id }),
+  privacy: (showActivity, allowRequests) => rpc('friends_set_privacy', { p_show_activity: showActivity, p_allow_requests: allowRequests }),
+  presence: (game, playing, total) => rpc('friends_presence', { p_game: game || null, p_playing: !!playing, p_total: Math.max(0, Math.round(total || 0)) }),
+  ensure: () => rpc('friends_ensure_profile'),
+  // upgrade 2 (docs/friends-setup-2.sql)
+  block: (id) => rpc('friends_block', { friendship_id: id }),
+  unblock: (userId) => rpc('friends_unblock', { p_user: userId }),
+  invite: (id, game) => rpc('friends_invite', { friendship_id: id, p_game: game }),
+  dismissInvite: (id) => rpc('friends_dismiss_invite', { invite_id: id }),
+  setStatus: (status, color) => rpc('friends_set_status', { p_status: status || null, p_color: color || null }),
+  syncLibrary: (list) => rpc('friends_sync_library', { p_library: list }),
+  profile: (id) => rpc('friends_profile', { friendship_id: id }),
+};
+
+module.exports = { init, email, isSignedIn, signUp, signIn, signOut, sync, deleteGame, friends };

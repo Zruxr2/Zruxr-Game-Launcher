@@ -6,6 +6,21 @@ For versions before 1.2.4, see the [Releases](../../releases) page.
 
 ## [Unreleased]
 
+## [1.2.7] - 2026-11-24
+
+### Changed
+
+- **Downloads page redesign.** A flatter, plainer look: bare covers, text tabs for sections, a thin Download button, and a one-line beta note.
+
+### Added
+
+- **New startup screen.** The Z draws itself inside a spinning ring over a soft moving glow, the name fades in letter by letter, and a thin bar fills as Zruxr loads. It fades out smoothly into the app and respects reduced motion.
+- **Simple FileKeeper view.** On FileKeeper download pages, the page counts down as normal. When its "If the download doesn't start automatically, click here." line appears, a plain dark screen covers the page (the main Download button and the ads are never shown) and only that line shows, in the middle of the screen. You press the link yourself. "Show the whole page" is always available. Turn it off in Settings > Simple FileKeeper view. There is also a **Copy debug info** button in the host panel that copies what the page is doing (web addresses cut down to host names) so problems can be reported.
+- **Hover panel on Downloads.** Hover a game and a panel floats beside it with what the game is (short description, genres, single-player/co-op, developer, release date, Metacritic when Steam has one), plus size, source, hosts, backups, date added and version/DLC tags. It also shows the game's banner and 3 screenshots. All of it comes from the Steam store, is looked up only when you hover, and is cached on your PC. The Downloads page also got a cleaner look.
+- **Friends upgrade** (run `docs/friends-setup-2.sql` once): **block list**, **invite to play** (your friend gets a notification), **Busy / Invisible** status, **profile cards** (profile colour, top games, total hours), **compare games** (who played shared games more), and a **Friends are playing** row on the Library page.
+- **Friend notifications.** A Windows notification for new requests, game invites, and when a friend starts a game you own. Turn it off in Friends > Privacy. Muted while you're Busy.
+- **Game won't start? helper.** One click checks the usual causes: missing file, empty file, tiny launcher .exe, Visual C++, DirectX, admin-only games and Windows Security detections, with a button to fix each one.
+
 ## [1.2.6] - 2026-11-22
 
 Uninstall like Steam, live download stats, themes, and a GTA VI banner.
@@ -14,6 +29,10 @@ Uninstall like Steam, live download stats, themes, and a GTA VI banner.
 
 - **Uninstall keeps the game in your library.** For games Zruxr downloaded, **Uninstall** (after a confirm box) deletes the game's files but leaves the game in your library, with its play time, cover and favorite. It shows **Not installed** with an **Install** button, which downloads it again and puts it back in the same spot. **Remove from library** still removes it fully. Only things Zruxr itself downloaded are ever deleted, and only inside the download folder.
 - **Download stats.** Each running download shows a speed graph (last minute), current and average speed, time left, elapsed time, when it will finish, and the total speed of all downloads.
+- **Friends.** Add friends by username, accept or decline requests, see who is playing right now, their last game and hours, and choose what you share. Needs one setup script run in Supabase: `docs/FRIENDS.md`.
+- **Downloads sections.** Clickable sections on the Downloads page: Big titles, Co-op & multiplayer, New, Open world, Shooters, RPG, Horror, Racing & sports, Survival & building, Small & indie. Co-op and New games get a badge.
+- **Runs in the tray.** Closing the window hides Zruxr to the tray instead of quitting, so games keep running and play time keeps counting. Open it again by clicking the tray icon, quit from its right-click menu, or turn it off in Settings.
+- **The create-account screen only shows on the very first launch** after installing. Sign in or create an account later from Settings.
 - **Themes.** Settings, Appearance: Dark, Midnight, Violet, Crimson, Forest and Light. The window's title bar changes colour too.
 - **"Antivirus removed it" warning.** If a finished download disappears within 15 minutes of being saved, the Downloads list says so, with an **Open Windows Security** button and a reminder to only restore files you trust.
 - **"GTA VI coming soon" banner** at the top of the Library (shown once you've added a source).
@@ -96,6 +115,8 @@ Downloads now finish the job: they land in the launcher's own folder, archives a
 - Only `.rar` and `.zip` are unpacked. `.7z`, `.iso` and multi-part RARs are downloaded but left for you to extract.
 - A page download can't resume after a restart; Retry reopens the page.
 
-[Unreleased]: ../../compare/v1.2.5...HEAD
+[Unreleased]: ../../compare/v1.2.7...HEAD
+[1.2.7]: ../../compare/v1.2.6...v1.2.7
+[1.2.6]: ../../compare/v1.2.5...v1.2.6
 [1.2.5]: ../../compare/v1.2.4...v1.2.5
 [1.2.4]: ../../compare/v1.2.3...v1.2.4

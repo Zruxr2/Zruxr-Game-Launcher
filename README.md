@@ -43,6 +43,7 @@ Most launchers want you to buy things. Zruxr doesn't sell anything. It's for the
 ### Downloads (beta)
 
 - **Sources.** Press **Add source** and paste a web address: a JSON list (including Hydra-style lists), a web page or open folder that links to files, or a direct file link. A **Downloads** tab shows a cover and a big Download button for every game. Press refresh on a source to re-read it.
+- **Browse by section.** Clickable sections like a store front: Big titles, Co-op & multiplayer, New, Open world, Shooters, RPG, Horror, Racing & sports, Survival & building, and Small & indie. Co-op and New games get a badge. Zruxr sorts games by reading the title, a built-in list of well-known games and file size, plus any `tags` or `genres` a source gives. It is a best guess, so a source can fix a game by adding `"tags": ["Co-op"]`.
 - **Search and sort.** Search the list and sort it by source order, name (A to Z or Z to A), size (largest or smallest) or date (newest or oldest). Your choice is remembered.
 - **Pick the host and the folder.** Pixeldrain downloads by itself. Gofile, FileKeeper, BuzzHeavier, FuckingFast and MediaFire open in a panel inside the launcher that tells you what to press ("Press Download and wait"; on FileKeeper, the button under the main Download button) and shows a big orange warning when a popup was blocked. Hosts that make you solve captchas are not used. Choose where each game is saved (inside Zruxr's own folder by default).
 - **Live download stats.** Every running download shows a speed graph for the last minute, current and average speed, time left, elapsed time and when it will finish, plus the combined speed of all downloads.
@@ -56,7 +57,11 @@ See [Downloads in detail](#downloads-in-detail).
 
 - **Updates itself.** The installed version checks GitHub Releases, downloads new versions in the background and shows "New version available" with progress, then **Restart now** (or installs when you close Zruxr). **Settings > Updates** has a **Check now** button and shows the reason if a check fails.
 - **Accounts are optional.** Zruxr works fully without one. With a free account, your game list and play time follow you between PCs.
+- **Downloads that explain themselves.** Hover a game for a description, genres, banner and screenshots from Steam. On FileKeeper links, an optional simple view hides the page and shows only the link you need to click.
+- **Cool startup.** An animated logo and loading bar when Zruxr opens.
+- **Friends.** Add people by username, see who is playing what, invite them to a game, block people, set Busy/Invisible, and compare games on a profile card. You choose what to share, and nothing is public. Needs a one-time setup: [docs/FRIENDS.md](docs/FRIENDS.md).
 - **Themes.** Dark, Midnight, Violet, Crimson, Forest or Light, in Settings.
+- **Keeps running in the tray.** Closing the window hides Zruxr to the system tray, so a game you're playing keeps being tracked. Right-click the tray icon to quit, or turn this off in Settings.
 - **Yours to tweak.** Cover size, start with Windows, a startup animation you can turn off, and switches for the Discover row and the Downloads tab.
 - **Safe by design.** Your sign-in is encrypted with Windows' own keychain and never reaches the page, repeated wrong passwords lock sign-in for a minute, your library is saved crash-safely, only one copy of Zruxr runs at a time, and the page has a strict content policy. The window can only run files you picked in the launcher's own dialogs, host pages run sandboxed and can only reach public web pages, and archives can't write outside their own folder.
 
@@ -201,7 +206,7 @@ If that still doesn't work, delete `node_modules` and run `npm install` again.
 
 ## Accounts and sync
 
-An account is completely optional. Zruxr asks once when it opens, and you can click **Not now** to use everything offline. Accounts use [Supabase](https://supabase.com). People sign in with a username and password, and the app handles the rest. Sign-in sessions are stored encrypted with Windows' own credential protection, so you stay signed in between launches. There is no email on an account, so there is no password reset: a forgotten password can't be recovered.
+An account is completely optional. Zruxr asks once, the first time you open it after installing, and you can click **Not now** to use everything offline. Accounts use [Supabase](https://supabase.com). People sign in with a username and password, and the app handles the rest. Sign-in sessions are stored encrypted with Windows' own credential protection, so you stay signed in between launches. There is no email on an account, so there is no password reset: a forgotten password can't be recovered.
 
 If you fork this and want your own backend, create a Supabase project, then replace `SUPABASE_URL` and `ANON_KEY` at the top of `cloud.js`. The anon key is designed to be public, but make sure Row Level Security is switched on for your tables so users can only read and write their own library.
 
@@ -215,7 +220,7 @@ If you fork this and want your own backend, create a Supabase project, then repl
 - Scan PC doesn't find Microsoft Store / Xbox games, and some Epic games may need the Epic launcher open to run from Zruxr.
 - "Whole PC" scans can take a few minutes, and stop after four.
 - The Discover row needs an internet connection. It uses Steam's public store data and stays hidden when offline.
-- The Friends tab is a placeholder for now.
+- Friends needs a one-time setup of your Supabase project: see [docs/FRIENDS.md](docs/FRIENDS.md). Run `docs/friends-setup-2.sql` too for block list, invites, status and profile cards.
 - Pages from file hosts are shown inside the launcher, but some hosts may refuse to continue in an embedded page (downloads are in beta). Use another host, **Open in browser**, or **I downloaded it**.
 - Only `.rar` and `.zip` are unpacked. `.7z`, `.iso` and multi-part RARs are left for you to extract.
 - Downloads are in beta: some hosts or games may fail, and the list only shows games with a link on a supported host.
@@ -227,7 +232,7 @@ If you fork this and want your own backend, create a Supabase project, then repl
 - [ ] `.7z` unpacking
 - [ ] Remember each host's success rate and rank hosts automatically
 - [ ] Sync favorites and daily history
-- [ ] Friends: see what others are playing
+- [x] Friends: see what others are playing (needs the one-time Supabase setup)
 - [x] Auto-update from GitHub Releases (installed version only)
 - [x] Download to a chosen folder, unpack archives and add games automatically
 - [x] Hosts that need a click, shown inside the launcher
@@ -247,8 +252,8 @@ To publish an update, either let GitHub do it or do it by hand.
 **Automatic (recommended).** Bump `version` in `package.json`, add the version to [CHANGELOG.md](CHANGELOG.md), commit, then push a tag that matches it:
 
 ```bash
-git tag v1.2.6
-git push origin v1.2.6
+git tag v1.2.7
+git push origin v1.2.7
 ```
 
 The **Release** workflow (`.github/workflows/release.yml`) runs the tests, checks the tag matches `package.json`, builds the installer and portable `.exe` on Windows, and publishes them with `latest.yml` and the `.blockmap` to a normal (non-draft) GitHub release. The release text is taken from `docs/release-notes/vX.Y.Z.md` if that file exists. The animated `Zruxr-Installer` is built locally with `npm run dist` and can be added to the release by hand.

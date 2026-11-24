@@ -9,9 +9,23 @@
 </head>
 <body>
   <div id="splash" class="splash">
-    <svg class="splash-logo" viewBox="124 140 282 244" aria-hidden="true"><path fill="currentColor" d="M133 150H383V207L222 305H383V362H133V305L294 207H133Z"/><circle cx="369" cy="348" r="30" fill="#a3a3a3"/></svg>
-    <div class="splash-mark">Zruxr</div>
-    <div class="splash-bar"><div id="splashFill" class="splash-fill"></div></div>
+    <div class="splash-aurora" aria-hidden="true"></div>
+    <div class="splash-grid" aria-hidden="true"></div>
+    <div class="splash-core">
+      <svg class="splash-orbit" viewBox="0 0 200 200" aria-hidden="true">
+        <circle class="orbit-track" cx="100" cy="100" r="94" />
+        <circle class="orbit-arc" cx="100" cy="100" r="94" pathLength="100" />
+      </svg>
+      <svg class="splash-logo" viewBox="124 140 282 244" aria-hidden="true">
+        <path class="logo-draw" pathLength="1" d="M133 150H383V207L222 305H383V362H133V305L294 207H133Z" />
+        <circle class="logo-dot" cx="369" cy="348" r="30" />
+      </svg>
+    </div>
+    <div class="splash-mark" role="img" aria-label="Zruxr"><span style="--n:0">Z</span><span style="--n:1">R</span><span style="--n:2">U</span><span style="--n:3">X</span><span style="--n:4">R</span></div>
+    <div class="splash-meter">
+      <div class="splash-bar"><div id="splashFill" class="splash-fill"></div></div>
+      <span id="splashPct" class="splash-pct">0%</span>
+    </div>
     <div id="splashStatus" class="splash-status"></div>
   </div>
 
@@ -24,7 +38,7 @@
         <button class="tab" id="dlTab" role="tab" aria-selected="false" data-tab="downloads" hidden>Downloads<span class="tab-count" id="dlCount" hidden></span></button>
         <button class="tab" role="tab" aria-selected="false" data-tab="favorites">Favorites<span class="tab-count" id="favCount" hidden></span></button>
         <button class="tab" role="tab" aria-selected="false" data-tab="stats">Stats</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="friends">Friends</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="friends">Friends<span class="tab-count" id="friendsCount" hidden></span></button>
         <button class="tab" role="tab" aria-selected="false" data-tab="settings">Settings</button>
         <span class="tab-ink" id="tabInk"></span>
       </nav>
@@ -109,13 +123,18 @@
           <div class="discover-row" id="discoverRow"></div>
         </section>
 
+        <section id="friendsPlaying" class="fp" hidden>
+          <h3 class="fp-h">Friends are playing</h3>
+          <div class="fp-row" id="fpRow"></div>
+        </section>
+
         <section id="libraryBlock" class="rise" data-rise="4">
           <div class="section-head">
             <h2 id="sectionTitle">All games</h2>
             <span class="section-count" id="sectionCount"></span>
           </div>
  <div id="grid" class="grid"></div>
-          <p class="lib-tip" id="libTip" hidden>Game won't start, or closes right away? Hover it, press <strong>Edit</strong> and choose a different <strong>.exe</strong>.</p>
+          <p class="lib-tip" id="libTip" hidden>Game won't start, or closes right away? Hover it, press <strong>Edit</strong> and choose a different <strong>.exe</strong>, or <button type="button" class="link" id="libCheck">run a quick check</button>.</p>
           <p id="noResults" class="no-results" hidden>No games match your search.</p>
           <div id="emptyFavs" class="empty-inline" hidden>
             <h3>No favorites yet.</h3>
@@ -155,6 +174,8 @@
           </div>
 
           <div id="dlActive" class="dl-active" hidden></div>
+
+          <div id="dlSections" class="sections" role="group" aria-label="Browse by section" hidden></div>
 
           <div class="dl-tools">
             <label class="search dl-search" for="dlSearch">
@@ -216,16 +237,71 @@
       <div id="pageFriends" class="page" hidden>
         <section class="page-head">
           <h1>Friends</h1>
-          <p class="stats">Coming in the next update</p>
+          <p class="stats" id="friendsSub">See what your friends are playing</p>
         </section>
 
-        <section class="panel coming">
-          <span class="soon-badge">Coming soon</span>
-          <h3>Friends is coming in the next update.</h3>
-          <p class="panel-note">There's nothing to set up yet. It will show up here when it's ready.</p>
-          <div class="friend-add" aria-hidden="true">
-            <input type="text" placeholder="Add a friend by username" disabled tabindex="-1" />
-            <button type="button" class="btn" disabled tabindex="-1">Add friend</button>
+        <section id="friendsSignedOut" class="panel" hidden>
+          <h3>Sign in to use Friends.</h3>
+          <p class="panel-note">Friends needs a free Zruxr account so people can find you by username.</p>
+          <div class="friend-actions"><button type="button" class="btn primary" id="friendsSignIn">Sign in or create an account</button></div>
+        </section>
+
+        <section id="friendsSetup" class="panel" hidden>
+          <h3>Friends isn't switched on yet.</h3>
+          <p class="panel-note">The server for Friends hasn't been set up. If you run this Zruxr, follow <em>docs/friends-setup.sql</em>: paste it into your Supabase SQL Editor and press Run, then reopen this page.</p>
+        </section>
+
+        <section id="friendsMain" hidden>
+          <div class="me-card" id="meCard">
+            <div class="friend-av" id="meAv"></div>
+            <div class="me-info">
+              <div class="friend-name" id="meName"></div>
+              <div class="segmented" id="statusSeg" role="group" aria-label="Your status">
+                <button type="button" data-status="online" aria-pressed="true">Online</button>
+                <button type="button" data-status="busy" aria-pressed="false">Busy</button>
+                <button type="button" data-status="invisible" aria-pressed="false">Invisible</button>
+              </div>
+            </div>
+            <div class="color-row" id="colorRow" role="group" aria-label="Profile colour"></div>
+          </div>
+
+          <form id="friendAddForm" class="friend-add-live" autocomplete="off">
+            <input id="friendUser" type="text" placeholder="Add a friend by username" aria-label="Friend's username" maxlength="21" spellcheck="false" />
+            <button type="submit" class="btn primary" id="friendAddBtn">Add friend</button>
+          </form>
+          <p class="friend-msg" id="friendMsg" role="status" hidden></p>
+
+          <div id="friendInvites" class="friend-block" hidden></div>
+          <div id="friendReqs" class="friend-block" hidden></div>
+          <h3 class="friend-h" id="friendsHead">Friends</h3>
+          <div id="friendList" class="friend-list"></div>
+          <p class="friends-empty" id="friendsEmpty" hidden>No friends yet. Add someone by their username, and ask them to add yours.</p>
+
+          <div id="friendBlocked" class="friend-block" hidden></div>
+
+          <h3 class="friend-h">Privacy</h3>
+          <div class="setting-card">
+            <div class="setting-row">
+              <div class="setting-text">
+                <div class="setting-name">Show what I'm playing</div>
+                <div class="setting-desc">Friends can see your current game, last game and hours.</div>
+              </div>
+              <label class="switch"><input type="checkbox" id="optShowActivity" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-text">
+                <div class="setting-name">Allow friend requests</div>
+                <div class="setting-desc">Turn off to stop new people from adding you.</div>
+              </div>
+              <label class="switch"><input type="checkbox" id="optAllowReq" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-text">
+                <div class="setting-name">Friend notifications</div>
+                <div class="setting-desc">A Windows notification for requests, invites, and when a friend starts a game you own. Off while you're Busy.</div>
+              </div>
+              <label class="switch"><input type="checkbox" id="optNotify" /><span></span></label>
+            </div>
           </div>
         </section>
       </div>
@@ -299,6 +375,20 @@
                   <div class="setting-desc" id="startDesc">Open Zruxr when you sign in to your PC.</div>
                 </div>
                 <label class="switch"><input type="checkbox" id="optStartup" /><span></span></label>
+              </div>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-name">Simple FileKeeper view</div>
+                  <div class="setting-desc">On FileKeeper pages, show a countdown, then only the button you need to press instead of the whole page. Turn off to see the whole page.</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="optSimpleHost" /><span></span></label>
+              </div>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-name">Keep running in the tray</div>
+                  <div class="setting-desc">Closing the window hides Zruxr to the tray, so your games keep being tracked. Quit from the tray icon.</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="optTray" /><span></span></label>
               </div>
               <div class="setting-row">
                 <div class="setting-text">
@@ -418,9 +508,51 @@
     <div class="launch-help-actions">
       <button type="button" id="launchHelpChange" class="btn sm primary">Change .exe</button>
       <button type="button" id="launchHelpFolder" class="btn sm">Show folder</button>
+      <button type="button" id="launchHelpCheck" class="btn sm">Run check</button>
       <button type="button" id="launchHelpClose" class="link">Dismiss</button>
     </div>
   </div>
+
+  <!-- Friend profile -->
+  <dialog id="profileDialog" class="profile-dialog">
+    <button type="button" id="profileClose" class="card-close" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div class="prof-head">
+      <div class="friend-av big" id="profAv"></div>
+      <div>
+        <h2 id="profName"></h2>
+        <p class="prof-sub" id="profSub"></p>
+      </div>
+    </div>
+    <p class="prof-hidden" id="profHidden" hidden>This friend isn't sharing their games.</p>
+    <div id="profBody">
+      <h4 class="prof-h">Top games</h4>
+      <ol class="prof-top" id="profTop"></ol>
+      <h4 class="prof-h">Compare games</h4>
+      <p class="prof-sub" id="profCompareSum"></p>
+      <div class="prof-compare" id="profCompare"></div>
+    </div>
+    <h4 class="prof-h">Invite to play</h4>
+    <div class="prof-invite">
+      <select id="profGame" aria-label="Game to invite them to"></select>
+      <button type="button" class="btn primary" id="profInvite">Invite</button>
+    </div>
+  </dialog>
+
+  <!-- Game won't start: checks -->
+  <dialog id="diagDialog" class="diag-dialog">
+    <button type="button" id="diagClose" class="card-close" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <h2>Game won't start?</h2>
+    <p class="scan-lead">Pick the game and Zruxr checks the usual causes. Nothing is changed.</p>
+    <div class="prof-invite">
+      <select id="diagGame" aria-label="Game to check"></select>
+      <button type="button" class="btn primary" id="diagRun">Check</button>
+    </div>
+    <ul class="diag-list" id="diagList"></ul>
+  </dialog>
 
   <!-- Add / Edit dialog -->
   <dialog id="gameDialog">
@@ -487,6 +619,7 @@
         </div>
         <div class="host-links" id="hostLinks" role="group" aria-label="Download host"></div>
         <div class="host-actions">
+          <button type="button" class="btn ghost small" id="hostDebug" title="Copy what this page is doing, to send to the developer">Copy debug info</button>
           <button type="button" class="btn ghost small" id="hostBrowser" title="Open this page in your normal browser">Open in browser</button>
           <button type="button" class="btn ghost small" id="hostAdopt" title="Pick a file you downloaded yourself">I downloaded it</button>
           <button type="button" class="host-x" id="hostClose" aria-label="Close and cancel" title="Close and cancel (Esc)">

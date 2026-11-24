@@ -8,7 +8,10 @@ const { pickBestExe } = require('../exe-pick');
 const { findGameExe } = require('../postprocess');
 
 const KB = 1024, MB = 1024 * KB;
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'zruxr-pick-'));
+const made = [];
+const tmp = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'zruxr-pick-')); made.push(d); return d; };
+// the fake game folders are big: remove them when the tests finish
+test.after(() => { for (const d of made) fs.rmSync(d, { recursive: true, force: true }); });
 const put = (root, rel, size) => {
   const f = path.join(root, rel);
   fs.mkdirSync(path.dirname(f), { recursive: true });

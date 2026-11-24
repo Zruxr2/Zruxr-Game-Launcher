@@ -132,6 +132,7 @@ function parseJson(data, baseUrl) {
     let sha256 = '';
     let date = '';
     let alts = [];
+    let tags = [];
     if (typeof entry === 'string') {
       url = resolveUrl(entry, baseUrl);
       title = url ? titleFromUrl(url) : '';
@@ -143,11 +144,14 @@ function parseJson(data, baseUrl) {
       size = sizeText(entry.fileSize ?? entry.size);
       sha256 = typeof entry.sha256 === 'string' && /^[a-f0-9]{64}$/i.test(entry.sha256) ? entry.sha256.toLowerCase() : '';
       date = typeof (entry.uploadDate || entry.date) === 'string' ? String(entry.uploadDate || entry.date).slice(0, 10) : '';
+      // Optional labels a source may give ("tags", "genres", "category"): used for the Downloads sections.
+      const raw = [entry.tags, entry.genres, entry.genre, entry.categories, entry.category].flat();
+      tags = raw.filter((t) => typeof t === 'string').map((t) => t.trim().slice(0, 40)).filter(Boolean).slice(0, 12);
     }
     if (!url) { skipped++; continue; }
     if (seen.has(url)) continue;
     seen.add(url);
-    items.push({ title: title || titleFromUrl(url), url, alts, size, sha256, date });
+    items.push({ title: title || titleFromUrl(url), url, alts, size, sha256, date, ...(tags.length ? { tags } : {}) });
   }
   return { name: cleanTitle(name), items, skipped, folders: [] };
 }

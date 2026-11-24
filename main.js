@@ -1,5 +1,5 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, nativeImage } = require('electron');
-const { spawn } = require('child_process');
+const { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, nativeImage, Tray, Menu, Notification } = require('electron');
+const { spawn, execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -10,6 +10,8 @@ const { rankExes } = require('./exe-pick');
 const updater = require('./updater');
 const { createDiscover } = require('./discover');
 const sources = require('./sources');
+const { diagnose } = require('./diagnose');
+const gameInfo = require('./game-info');
 const { uninstallTarget, legacyUninstallTarget, writeFileAtomic, makeThrottle } = require('./install-utils');
 
 // ---------- Security: only trust paths the user picked in our own dialogs ----------
@@ -62,7 +64,7 @@ function applyThemeBar(name) {
 }
 
 const settingsFile = () => path.join(dataDir(), 'settings.json');
-const DEFAULT_SETTINGS = { cardSize: 'medium', startupAnimation: true, startWithWindows: false, sort: 'name', showDiscover: true, showDownloads: true, promoDismissed: false, downloadDir: '', theme: 'dark' };
+const DEFAULT_SETTINGS = { cardSize: 'medium', startupAnimation: true, startWithWindows: false, sort: 'name', showDiscover: true, showDownloads: true, promoDismissed: false, downloadDir: '', theme: 'dark', closeToTray: true, notifyFriends: true, simpleHost: true };
 
 function loadSettings() {
   try {
@@ -157,9 +159,42 @@ function addPlayTime(id, { final }) {
 function recordSession(id) {
   if (!running.has(id)) return; // already recorded (e.g. on quit)
   addPlayTime(id, { final: true });
+  const name = (loadLibrary().find((g) => g.id === id) || {}).name;
   running.delete(id);
   pushLibrary();
   scheduleSync();
+  reportPresence(name); // tell friends the game was closed
+  shareLibrary();
+}
+
+// ---------- Friends: presence ----------
+// While signed in, tell the server what is being played so friends can see it (they only do if "Show what I'm
+// playing" is on, and the server hides it again if it hasn't heard from us for 3 minutes). Best effort only.
+let friendsOff = false; // the server has no Friends tables yet: stop asking until sign-in
+async function reportPresence(lastName) {
+  if (friendsOff || !cloud.isSignedIn()) return;
+  try {
+    const games = loadLibrary();
+    const total = games.reduce((n, g) => n + (g.playTimeSeconds || 0), 0);
+    const now = [...running.keys()].map((id) => (games.find((g) => g.id === id) || {}).name).filter(Boolean)[0];
+    await cloud.friends.presence(now || lastName || '', !!now, total);
+  } catch (err) {
+    if (err.message === 'FRIENDS_NOT_SET_UP') friendsOff = true;
+  }
+}
+setInterval(() => { if (running.size) reportPresence(); }, 60 * 1000);
+
+// Share game names + hours with friends (for profile cards and "compare games"). Only friends can see it,
+// and only if "Show what I'm playing" is on. At most once every 2 minutes.
+let lastLibShare = 0;
+async function shareLibrary(force) {
+  if (friendsOff || !cloud.isSignedIn()) return;
+  if (!force && Date.now() - lastLibShare < 120000) return;
+  lastLibShare = Date.now();
+  try {
+    const list = loadLibrary().filter((g) => g.name).map((g) => ({ n: String(g.name).slice(0, 100), s: Math.round(g.playTimeSeconds || 0) })).slice(0, 300);
+    await cloud.friends.syncLibrary(list);
+  } catch { /* old server without upgrade 2, or offline: fine */ }
 }
 
 // Save progress every minute so a crash or power cut doesn't lose a whole session.
@@ -210,6 +245,7 @@ function launchGame(id) {
       }
     });
     pushLibrary();
+    reportPresence();
     return { ok: true };
   } catch (err) {
     running.delete(id);
@@ -864,6 +900,10 @@ ipcMain.handle('settings:set', (_e, patch) => {
   if (typeof patch.showDiscover === 'boolean') next.showDiscover = patch.showDiscover;
   if (typeof patch.showDownloads === 'boolean') next.showDownloads = patch.showDownloads;
   if (typeof patch.promoDismissed === 'boolean') next.promoDismissed = patch.promoDismissed;
+  if (typeof patch.closeToTray === 'boolean') next.closeToTray = patch.closeToTray;
+  if (typeof patch.welcomeSeen === 'boolean') next.welcomeSeen = patch.welcomeSeen;
+  if (typeof patch.notifyFriends === 'boolean') next.notifyFriends = patch.notifyFriends;
+  if (typeof patch.simpleHost === 'boolean') next.simpleHost = patch.simpleHost;
   if (THEME_BARS[patch.theme]) { next.theme = patch.theme; applyThemeBar(patch.theme); }
   if (typeof patch.downloadDir === 'string' && path.isAbsolute(patch.downloadDir)) next.downloadDir = patch.downloadDir;
   if (typeof patch.startWithWindows === 'boolean') {
@@ -980,6 +1020,131 @@ function scheduleSync(delay = 3000) {
 
 ipcMain.handle('account:get', () => ({ ...accountState }));
 
+// ---------- Friends ----------
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const USERNAME_RE = /^[A-Za-z0-9_.-]{3,20}$/;
+async function friendsCall(fn) {
+  if (!cloud.isSignedIn()) return { ok: false, error: 'Sign in to use Friends.', code: 'signed_out' };
+  try {
+    return { ok: true, data: await fn() };
+  } catch (err) {
+    if (err.message === 'FRIENDS_NOT_SET_UP') return { ok: false, code: 'not_set_up', error: "Friends isn't set up on the server yet." };
+    return { ok: false, error: err.message || 'Something went wrong.', code: err.code || '' };
+  }
+}
+ipcMain.handle('friends:overview', () => friendsCall(() => cloud.friends.overview()));
+ipcMain.handle('friends:add', (_e, username) => {
+  const name = String(username || '').trim().replace(/^@/, '');
+  if (!USERNAME_RE.test(name)) return { ok: false, error: 'Usernames are 3 to 20 characters: letters, numbers, _ . and -' };
+  return friendsCall(() => cloud.friends.add(name));
+});
+ipcMain.handle('friends:respond', (_e, id, accept) => (UUID_RE.test(String(id)) ? friendsCall(() => cloud.friends.respond(id, accept === true)) : { ok: false, error: 'Bad request.' }));
+ipcMain.handle('friends:remove', (_e, id) => (UUID_RE.test(String(id)) ? friendsCall(() => cloud.friends.remove(id)) : { ok: false, error: 'Bad request.' }));
+ipcMain.handle('friends:privacy', (_e, p) => {
+  p = p || {};
+  return friendsCall(async () => {
+    await cloud.friends.privacy(typeof p.showActivity === 'boolean' ? p.showActivity : null, typeof p.allowRequests === 'boolean' ? p.allowRequests : null);
+    if (p.showActivity === true) reportPresence();
+  });
+});
+
+const friendIdOk = (id) => UUID_RE.test(String(id));
+const BAD = { ok: false, error: 'Bad request.' };
+ipcMain.handle('friends:block', (_e, id) => (friendIdOk(id) ? friendsCall(() => cloud.friends.block(id)) : BAD));
+ipcMain.handle('friends:unblock', (_e, userId) => (friendIdOk(userId) ? friendsCall(() => cloud.friends.unblock(userId)) : BAD));
+ipcMain.handle('friends:invite', (_e, id, game) => {
+  const g = String(game || '').trim().slice(0, 100);
+  if (!friendIdOk(id) || !g) return BAD;
+  return friendsCall(() => cloud.friends.invite(id, g));
+});
+ipcMain.handle('friends:dismissInvite', (_e, id) => (friendIdOk(id) ? friendsCall(() => cloud.friends.dismissInvite(id)) : BAD));
+ipcMain.handle('friends:status', (_e, p) => {
+  p = p || {};
+  const status = ['online', 'busy', 'invisible'].includes(p.status) ? p.status : null;
+  const color = typeof p.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(p.color) ? p.color : null;
+  if (!status && !color) return BAD;
+  return friendsCall(async () => {
+    await cloud.friends.setStatus(status, color);
+    if (status === 'invisible') reportPresence();
+  });
+});
+ipcMain.handle('friends:profile', (_e, id) => (friendIdOk(id) ? friendsCall(() => cloud.friends.profile(id)) : BAD));
+
+// ---------- Friends: notifications ----------
+// Every minute: look for new friend requests, game invites, and friends who just started a game you own.
+// Shows a Windows notification (if "Friend notifications" is on) and hands the fresh lists to the window.
+let friendsSeen = null; // first poll only learns what's already there, so you aren't spammed on startup
+function notify(title, body) {
+  if (!loadSettings().notifyFriends || !Notification.isSupported()) return;
+  try {
+    const n = new Notification({ title: String(title).slice(0, 80), body: String(body).slice(0, 160), silent: false });
+    n.on('click', () => { showWindow(); send('ui:open-tab', 'friends'); });
+    n.show();
+  } catch { /* notifications are optional */ }
+}
+async function pollFriends() {
+  if (friendsOff || !cloud.isSignedIn()) { friendsSeen = null; return; }
+  let d;
+  try { d = await cloud.friends.overview(); } catch (err) {
+    if (err.message === 'FRIENDS_NOT_SET_UP') friendsOff = true;
+    return;
+  }
+  if (!d) return;
+  send('friends:update', d);
+  const owned = new Set(loadLibrary().map((g) => String(g.name || '').toLowerCase()));
+  const cur = {
+    req: new Set((d.incoming || []).map((r) => r.id)),
+    inv: new Set((d.invites || []).map((i) => i.id)),
+    play: new Map((d.friends || []).filter((f) => f.playing).map((f) => [f.username, f.playing])),
+  };
+  if (friendsSeen && d.me && d.me.status !== 'busy') {
+    for (const r of d.incoming || []) if (!friendsSeen.req.has(r.id)) notify('New friend request', `${r.username} wants to be your friend.`);
+    for (const i of d.invites || []) if (!friendsSeen.inv.has(i.id)) notify(`${i.from} invited you to play`, i.game);
+    for (const [name, game] of cur.play) {
+      if (friendsSeen.play.get(name) !== game && owned.has(String(game).toLowerCase())) notify(`${name} is playing ${game}`, 'You have this game. Join them!');
+    }
+  }
+  friendsSeen = cur;
+}
+setInterval(pollFriends, 60 * 1000);
+
+// ---------- Game won't start: checks ----------
+function defenderCheck(dir) {
+  // Asks Windows Security for detections that mention this game's folder. The folder goes in through an
+  // environment variable, never into the command text.
+  return new Promise((resolve, reject) => {
+    const script = "$d=$env:ZRUXR_DIR; $r=@(Get-MpThreatDetection -ErrorAction Stop | Where-Object { $_.Resources -and ($_.Resources -join ' ') -like ('*'+$d+'*') }); $r.Count";
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script],
+      { timeout: 10000, windowsHide: true, env: { ...process.env, ZRUXR_DIR: dir } },
+      (err, stdout) => {
+        if (err) return reject(err);
+        const n = parseInt(String(stdout).trim(), 10);
+        resolve(Number.isFinite(n) ? new Array(Math.min(n, 50)).fill(1) : null);
+      });
+  });
+}
+ipcMain.handle('game:diagnose', async (_e, id) => {
+  const game = loadLibrary().find((g) => g.id === id);
+  if (!game) return { ok: false, error: 'Game not found.' };
+  return { ok: true, checks: await diagnose(game, { defenderCheck }) };
+});
+const DIAG_LINKS = {
+  vcredist: 'https://aka.ms/vs/17/release/vc_redist.x64.exe',
+  directx: 'https://www.microsoft.com/en-us/download/details.aspx?id=35',
+};
+let infoApi = null;
+ipcMain.handle('info:get', (_e, title) => {
+  const t = String(title || '').trim().slice(0, 200);
+  if (!t) return null;
+  if (!infoApi) infoApi = gameInfo.create({ net, cacheFile: path.join(dataDir(), 'gameinfo.json'), imgDir: path.join(dataDir(), 'gameinfo-img'), fetchImage: downloadFirstImage });
+  return infoApi.get(t);
+});
+ipcMain.handle('game:diagLink', (_e, key) => {
+  if (!Object.prototype.hasOwnProperty.call(DIAG_LINKS, key)) return false;
+  shell.openExternal(DIAG_LINKS[key]);
+  return true;
+});
+
 const authThrottle = makeThrottle();
 const authWaitMsg = (s) => `Too many tries. Wait ${s} second${s === 1 ? '' : 's'} and try again.`;
 
@@ -993,10 +1158,12 @@ ipcMain.handle('account:signIn', async (_e, { username, password } = {}) => {
     return { ok: false, error: err.message };
   }
   authThrottle.ok();
+  friendsOff = false;
   accountState.email = cloud.email();
   accountState.error = null;
   publishAccount();
   runSync();
+  cloud.friends.ensure().then(() => shareLibrary(true)).catch(() => {}); // so friends can find this username
   return { ok: true };
 });
 
@@ -1010,10 +1177,12 @@ ipcMain.handle('account:signUp', async (_e, { username, password } = {}) => {
   } catch (err) {
     return { ok: false, error: err.message };
   }
+  friendsOff = false;
   accountState.email = cloud.email();
   accountState.error = null;
   publishAccount();
   runSync();
+  cloud.friends.ensure().then(() => shareLibrary(true)).catch(() => {});
   return { ok: true };
 });
 
@@ -1059,7 +1228,57 @@ function createWindow() {
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.webContents.on('will-attach-webview', (e) => e.preventDefault());
 
+  // Closing the window hides Zruxr to the tray instead of quitting, so a game you're playing keeps being
+  // tracked and Zruxr is one click away. Quit for real from the tray menu (or turn this off in Settings).
+  win.on('close', (e) => {
+    if (quitting || !loadSettings().closeToTray) return;
+    e.preventDefault();
+    win.hide();
+    if (!loadSettings().trayHintShown) {
+      writeSettingsPatch({ trayHintShown: true });
+      if (tray && tray.displayBalloon) tray.displayBalloon({ title: 'Zruxr is still running', content: 'It stays in the tray so your games keep being tracked. Right-click the icon to quit.', iconType: 'info' });
+    }
+  });
+
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+}
+
+let tray = null;
+let quitting = false;
+
+function writeSettingsPatch(patch) {
+  try {
+    fs.mkdirSync(dataDir(), { recursive: true });
+    writeFileAtomic(settingsFile(), JSON.stringify({ ...loadSettings(), ...patch }, null, 2));
+  } catch {}
+}
+
+function showWindow() {
+  if (!win || win.isDestroyed()) { createWindow(); return; }
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+function createTray() {
+  if (tray) return;
+  try {
+    const img = nativeImage.createFromPath(path.join(__dirname, 'build', 'icon.png')).resize({ width: 16, height: 16 });
+    tray = new Tray(img);
+  } catch { return; } // no tray available: closing the window just quits, like before
+  tray.setToolTip('Zruxr');
+  const menu = () => {
+    const playing = [...running.keys()].length;
+    return Menu.buildFromTemplate([
+      { label: 'Open Zruxr', click: showWindow },
+      { label: playing ? `${playing} game${playing === 1 ? '' : 's'} running` : 'No games running', enabled: false },
+      { type: 'separator' },
+      { label: 'Quit Zruxr', click: () => { quitting = true; app.quit(); } },
+    ]);
+  };
+  tray.on('click', showWindow);
+  tray.on('right-click', () => tray.popUpContextMenu(menu()));
+  tray.setContextMenu(menu());
 }
 
 // Serve cover images through a safe custom protocol: cover://covers/<filename>
@@ -1072,9 +1291,7 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
-    if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
-  });
+  app.on('second-instance', () => showWindow());
 }
 
 // Belt and braces: nothing in the launcher may open a <webview>, whatever a page asks for.
@@ -1084,20 +1301,32 @@ app.on('web-contents-created', (_e, contents) => {
 
 app.whenReady().then(() => {
   if (!gotLock) return;
+  // First launch after installing = no settings and no library yet. Anyone who already has data counts as
+  // having seen the welcome (create account) screen, so an update never shows it again.
+  if (loadSettings().welcomeSeen === undefined) {
+    const fresh = !fs.existsSync(settingsFile()) && !fs.existsSync(libraryFile());
+    writeSettingsPatch({ welcomeSeen: !fresh });
+  }
   protocol.handle('cover', (request) => {
     const url = new URL(request.url);
     const fileName = path.basename(decodeURIComponent(url.pathname));
-    const dir = url.hostname === 'discover' ? discoverDir() : coversDir(); // cover://discover/<file> = Discover thumbnails
+    // cover://discover/<file> = Discover thumbnails, cover://shots/<file> = pictures for the Downloads hover panel
+    const dir = url.hostname === 'discover' ? discoverDir() : url.hostname === 'shots' ? path.join(dataDir(), 'gameinfo-img') : coversDir();
     const full = path.join(dir, fileName);
     return net.fetch(pathToFileURL(full).toString());
   });
   createWindow();
+  createTray();
 
   cloud.init();
+  if (cloud.isSignedIn()) {
+    cloud.friends.ensure().then(() => { shareLibrary(true); pollFriends(); }).catch(() => {}); // so friends can find this username
+  }
   updater.init(send);
   sourcesApi = sources.init({
     send,
     dataDir,
+    getSimpleHost: () => loadSettings().simpleHost,
     getDownloadDir: () => loadSettings().downloadDir || path.join(dataDir(), 'Games'), // default: inside the launcher's own folder
     setDownloadDir: (dir) => {
       const next = { ...loadSettings(), downloadDir: dir };
@@ -1148,12 +1377,11 @@ app.whenReady().then(() => {
     if (!g.cover && g.coverSource !== 'manual' && stale) queueCover(g.id);
   }
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+  app.on('activate', () => showWindow());
 });
 
 app.on('before-quit', () => {
+  quitting = true; // let the window really close now (also needed for "Restart now" to install an update)
   // Record play time for anything still running when the launcher closes.
   for (const id of [...running.keys()]) recordSession(id);
 });
