@@ -14,7 +14,8 @@ const path = require('path');
 const CHECK_EVERY = 4 * 60 * 60 * 1000;
 const RETRY_AFTER_ERROR = 10 * 60 * 1000;
 
-function init(send) {
+function init(send, hooks = {}) {
+  const busy = () => { try { return !!(hooks.isBusy && hooks.isBusy()); } catch { return false; } };
   const supported = app.isPackaged && process.platform === 'win32' && !process.env.PORTABLE_EXECUTABLE_DIR;
   let state = {
     status: supported ? 'idle' : 'unsupported', // idle | checking | downloading | ready | current | error | unsupported
@@ -48,7 +49,11 @@ function init(send) {
     return state;
   });
   ipcMain.handle('update:install', () => {
-    if (autoUpdater && state.status === 'ready') autoUpdater.quitAndInstall(true, true);
+    if (!(autoUpdater && state.status === 'ready')) return;
+    log('installing now');
+    try { if (hooks.beforeInstall) hooks.beforeInstall(); } catch (e) { log('beforeInstall failed', e); }
+    // a moment later, so the window can finish what it is doing and nothing is stuck waiting on it
+    setTimeout(() => autoUpdater.quitAndInstall(true, true), 300);
   });
 
   if (!supported) {
@@ -68,7 +73,16 @@ function init(send) {
   autoUpdater.on('checking-for-update', () => set({ status: 'checking', error: '' }));
   autoUpdater.on('update-available', (info) => { log('update available:', info.version); set({ status: 'downloading', version: info.version, percent: 0, error: '' }); });
   autoUpdater.on('update-not-available', (info) => { log('no update; latest published is', info && info.version); set({ status: 'current', checkedAt: Date.now() }); });
-  autoUpdater.on('download-progress', (p) => set({ status: 'downloading', percent: Math.round(p.percent || 0) }));
+  // The download reports progress hundreds of times a second. Passing every one to the window makes it redraw
+  // non-stop, so only pass on a change of whole percent, and at most twice a second.
+  let lastPct = -1, lastAt = 0;
+  autoUpdater.on('download-progress', (p) => {
+    const pct = Math.round(p.percent || 0);
+    const now = Date.now();
+    if (pct === lastPct || now - lastAt < 500) return;
+    lastPct = pct; lastAt = now;
+    set({ status: 'downloading', percent: pct });
+  });
   autoUpdater.on('update-downloaded', (info) => { log('update downloaded:', info.version); set({ status: 'ready', version: info.version, percent: 100 }); });
   autoUpdater.on('error', (err) => {
     log('error', err);
@@ -80,6 +94,8 @@ function init(send) {
   });
 
   async function check() {
+    // Never start a download while a game is running: it would fight the game for disk and network.
+    if (busy()) { log('a game is running, will check later'); setTimeout(check, 10 * 60 * 1000).unref(); return; }
     try {
       await autoUpdater.checkForUpdates();
     } catch (e) {
@@ -88,7 +104,7 @@ function init(send) {
     }
   }
 
-  setTimeout(check, 8000); // let the app finish opening first
+  setTimeout(check, 60 * 1000); // let the app finish opening (library, covers, friends) before downloading anything
   setInterval(() => {
     if (state.status !== 'downloading' && state.status !== 'ready') check();
   }, CHECK_EVERY).unref();

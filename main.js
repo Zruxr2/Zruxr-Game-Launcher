@@ -1322,7 +1322,11 @@ app.whenReady().then(() => {
   if (cloud.isSignedIn()) {
     cloud.friends.ensure().then(() => { shareLibrary(true); pollFriends(); }).catch(() => {}); // so friends can find this username
   }
-  updater.init(send);
+  updater.init(send, {
+    isBusy: () => running.size > 0,
+    // the tray and the hidden window must not hold the app open while the installer is trying to replace it
+    beforeInstall: () => { quitting = true; try { if (tray) { tray.destroy(); tray = null; } } catch {} },
+  });
   sourcesApi = sources.init({
     send,
     dataDir,

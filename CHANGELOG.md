@@ -10,6 +10,7 @@ For versions before 1.2.4, see the [Releases](../../releases) page.
 
 ### Changed
 
+- **Gentler auto-update.** The update now waits a minute after Zruxr opens, never downloads while a game is running, no longer makes the window redraw hundreds of times a second during the download, and closes the tray icon before installing so nothing holds the installer up.
 - **Downloads page redesign.** A flatter, plainer look: bare covers, text tabs for sections, a thin Download button, and a one-line beta note.
 
 ### Added
